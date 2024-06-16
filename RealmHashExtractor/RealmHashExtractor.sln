@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.002.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RealmHashExtractor", "RealmHashExtractor.csproj", "{BCD5E066-402B-4CE1-AA59-CBFECD8DA027}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BCD5E066-402B-4CE1-AA59-CBFECD8DA027}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BCD5E066-402B-4CE1-AA59-CBFECD8DA027}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BCD5E066-402B-4CE1-AA59-CBFECD8DA027}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BCD5E066-402B-4CE1-AA59-CBFECD8DA027}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1BC8DDDB-028A-4FB7-92FE-1C365CB87DB1}
+	EndGlobalSection
+EndGlobal
