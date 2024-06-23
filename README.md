@@ -8,8 +8,8 @@ Some very simple and dirty tools for playing osu! songs in terminal.
 
 - [ ] Add a proper README.
 - [ ] Code cleanup (currently it is done rushy and messy).
-- [ ] Show correct metadata in mpris.
-- [ ] TUI support.
+- [x] Show correct metadata in mpris.
+- [x] TUI support.
 
 ## License
 

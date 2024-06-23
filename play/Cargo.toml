@@ -5,6 +5,11 @@ edition = "2021"
 
 [dependencies]
 crossterm = "0.27.0"
+image = "0.25.1"
 libmpv-sirno = "=2.0.2-fork.1"
+rand = "0.8.5"
 ratatui = "0.26.3"
-souvlaki = "0.7.3"
+ratatui-image = "1.0.1"
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = "1.0.117"
+souvlaki = { version = "0.7.3", default-features = false, features = ["use_zbus"] }
