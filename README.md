@@ -30,6 +30,16 @@ cargo build --release
 target/release/play ../song.json ~/.var/app/sh.ppy.osu/data/osu/files/
 ```
 
+#### Keyboard shortcuts
+
+- q: quit
+- <: previous song
+- \>: next song
+- space: pause/play
+- u: toggle unicode mode
+- (left): seek backward 5s
+- (right): seek forward 5s
+
 #### Screenshots
 
 ![in BlackBox](assets/blackbox-1.png)
