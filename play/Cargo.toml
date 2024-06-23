@@ -1,0 +1,10 @@
+[package]
+name = "play"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crossterm = "0.27.0"
+libmpv-sirno = "=2.0.2-fork.1"
+ratatui = "0.26.3"
+souvlaki = "0.7.3"
