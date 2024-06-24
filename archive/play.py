@@ -19,7 +19,7 @@ random.shuffle(songs)
 
 for song in songs:
     audio_hash = song["AudioHash"]
-    background_hash = song["BGHash"]
+    background_hash = random.choice(song["BGHashes"])
     title = song["Metadata"]["Title"]
     title_unicode = song["Metadata"]["TitleUnicode"]
     artist = song["Metadata"]["Artist"]

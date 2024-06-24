@@ -40,7 +40,7 @@ Realm db = Realm.GetInstance(config);
 List<BeatmapCollection> collections = [.. db.All<BeatmapCollection>()];
 Console.Error.WriteLine($"Loaded {collections.Count} collections");
 
-Dictionary<(string, string), BeatmapMetadata> beatmapsByAudioBGFiles = [];
+Dictionary<(string, string), BeatmapCleanMetadata> beatmapsByAudioBGFiles = [];
 
 foreach (BeatmapCollection collection in collections)
 {
@@ -82,12 +82,29 @@ foreach (BeatmapCollection collection in collections)
                 Console.Error.WriteLine($"      Missing audio or bg hash for {beatmap.Metadata.Artist} - {beatmap.Metadata.Title} [{beatmap.DifficultyName}] {beatmap.MD5Hash}");
                 continue;
             }
-            beatmapsByAudioBGFiles[(audioHash, bgHash)] = beatmap.Metadata;
+            var metadata = new BeatmapCleanMetadata
+            {
+                Title = beatmap.Metadata.Title,
+                TitleUnicode = beatmap.Metadata.TitleUnicode,
+                Artist = beatmap.Metadata.Artist,
+                ArtistUnicode = beatmap.Metadata.ArtistUnicode,
+                Source = beatmap.Metadata.Source,
+                Tags = beatmap.Metadata.Tags
+            };
+            if (beatmapsByAudioBGFiles.ContainsKey((audioHash, bgHash)) && !beatmapsByAudioBGFiles[(audioHash, bgHash)].Equals(metadata))
+            {
+                Console.Error.WriteLine($"      Duplicate audio and bg hash for {beatmap.Metadata.Artist} - {beatmap.Metadata.Title} [{beatmap.DifficultyName}] {beatmap.MD5Hash}");
+                Console.Error.WriteLine($"        Old: {beatmapsByAudioBGFiles[(audioHash, bgHash)]}");
+                Console.Error.WriteLine($"        New: {metadata}");
+                Console.Error.WriteLine("        Overwriting anyway.");
+            }
+            beatmapsByAudioBGFiles[(audioHash, bgHash)] = metadata;
         }
     }
 }
 
-List<BeatmapFileMetadataInfo> beatmapFileMetadataInfos = [];
+// audioHash -> Metadata
+Dictionary<string, BeatmapFileMetadataInfo> beatmapFileMetadataInfos = [];
 
 foreach (var pair in beatmapsByAudioBGFiles)
 {
@@ -95,24 +112,31 @@ foreach (var pair in beatmapsByAudioBGFiles)
     // var beatmaps = pair.Value;
     // Console.WriteLine($"{beatmaps.Artist} - {beatmaps.Title}");
     // Console.WriteLine($"  Audio: {audioHash}, BG: {bgHash}");
-    var info = new BeatmapFileMetadataInfo
+    var audioHash = pair.Key.Item1;
+    var bgHash = pair.Key.Item2;
+    var metadata = pair.Value;
+    if (!beatmapFileMetadataInfos.TryGetValue(audioHash, out BeatmapFileMetadataInfo value))
     {
-        AudioHash = pair.Key.Item1,
-        BGHash = pair.Key.Item2,
-        Metadata = new BeatmapCleanMetadata
+        beatmapFileMetadataInfos[audioHash] = new BeatmapFileMetadataInfo
         {
-            Title = pair.Value.Title,
-            TitleUnicode = pair.Value.TitleUnicode,
-            Artist = pair.Value.Artist,
-            ArtistUnicode = pair.Value.ArtistUnicode,
-            Source = pair.Value.Source,
-            Tags = pair.Value.Tags
+            AudioHash = audioHash,
+            BGHashes = [bgHash],
+            Metadata = metadata
+        };
+    }
+    else
+    {
+        value.BGHashes.Add(bgHash);
+        if (!value.Metadata.Equals(metadata))
+        {
+            Console.Error.WriteLine($"      Different metadata for {metadata.Artist} - {metadata.Title}");
+            Console.Error.WriteLine($"        Old: {value.Metadata}");
+            Console.Error.WriteLine($"        New: {metadata}");
         }
-    };
-    beatmapFileMetadataInfos.Add(info);
+    }
 }
 
-string jsonString = JsonSerializer.Serialize(beatmapFileMetadataInfos);
+string jsonString = JsonSerializer.Serialize(beatmapFileMetadataInfos.Values);
 Console.WriteLine(jsonString);
 
 
@@ -124,11 +148,37 @@ struct BeatmapCleanMetadata
     public string ArtistUnicode { get; set; }
     public string Source { get; set; }
     public string? Tags { get; set; }
+
+    public override readonly bool Equals(object? obj)
+    {
+        if (obj is not BeatmapCleanMetadata other)
+        {
+            return false;
+        }
+
+        // Don't compare tags
+        return Title == other.Title &&
+            TitleUnicode == other.TitleUnicode &&
+            Artist == other.Artist &&
+            ArtistUnicode == other.ArtistUnicode &&
+            Source == other.Source;
+    }
+
+    public override readonly int GetHashCode()
+    {
+        // Don't include tags
+        return HashCode.Combine(Title, TitleUnicode, Artist, ArtistUnicode, Source);
+    }
+
+    public override readonly string ToString()
+    {
+        return $"Title: {Title}, TitleUnicode: {TitleUnicode}, Artist: {Artist}, ArtistUnicode: {ArtistUnicode}, Source: {Source}, Tags: {Tags}";
+    }
 }
 
 struct BeatmapFileMetadataInfo
 {
     public string AudioHash { get; set; }
-    public string BGHash { get; set; }
+    public List<string> BGHashes { get; set; }
     public BeatmapCleanMetadata Metadata { get; set; }
 }

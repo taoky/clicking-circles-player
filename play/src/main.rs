@@ -54,8 +54,8 @@ struct Metadata {
 #[serde(rename_all = "PascalCase")]
 struct JsonItem {
     audio_hash: String,
-    #[serde(rename = "BGHash")]
-    bg_hash: String,
+    #[serde(rename = "BGHashes")]
+    bg_hashes: Vec<String>,
     metadata: Metadata,
 }
 
@@ -136,10 +136,13 @@ impl App {
         self.set_metadata();
 
         if let Some(picker) = picker.as_mut() {
+            let bg_hashes = &self.json_item[self.idx].bg_hashes;
+            // randomly choose one
+            let bg_hash = bg_hashes.choose(&mut rand::thread_rng()).unwrap();
             self.bg_img = picker.new_resize_protocol(
                 image::io::Reader::open(get_file_path(
                     &self.osu_path,
-                    &self.json_item[self.idx].bg_hash,
+                    bg_hash,
                 ))
                 .unwrap()
                 .with_guessed_format()
