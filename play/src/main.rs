@@ -1,8 +1,10 @@
+use clap::Parser;
 use crossterm::{
     event,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
+use image::{imageops::crop_imm, GenericImageView};
 use libmpv::{
     events::{Event, PropertyData},
     mpv_end_file_reason, Mpv,
@@ -23,6 +25,7 @@ use std::{
     sync::mpsc,
     time::Duration,
 };
+use url::Url;
 
 enum InternalEvent {
     Pos(f64),
@@ -63,6 +66,14 @@ fn get_file_path(osu_path: &Path, hash: &str) -> PathBuf {
     osu_path.join(&hash[0..1]).join(&hash[0..2]).join(hash)
 }
 
+fn center_largest_square_crop<I: GenericImageView>(img: &I) -> image::SubImage<&I> {
+    let (w, h) = img.dimensions();
+    let side_len = w.min(h);
+    let x = (w - side_len) / 2;
+    let y = (h - side_len) / 2;
+    crop_imm(img, x, y, side_len, side_len)
+}
+
 struct App {
     progress: f64,
     total: f64,
@@ -71,11 +82,13 @@ struct App {
     title: String,
     artist: String,
     source: String,
+    cover_path: Option<PathBuf>,
     is_unicode: bool,
     bg_img: Box<dyn StatefulProtocol>,
     osu_path: PathBuf,
     json_item: Vec<JsonItem>,
     controls: MediaControls,
+    xdg_dirs: xdg::BaseDirectories,
 }
 
 impl App {
@@ -84,6 +97,7 @@ impl App {
         controls: MediaControls,
         osu_path: &Path,
         json_item: Vec<JsonItem>,
+        xdg_dirs: xdg::BaseDirectories,
     ) -> Self {
         App {
             progress: 0.0,
@@ -93,11 +107,13 @@ impl App {
             title: String::new(),
             artist: String::new(),
             source: String::new(),
+            cover_path: None,
             is_unicode: false,
             bg_img: picker.new_resize_protocol(image::DynamicImage::new_rgb8(1, 1)),
             osu_path: osu_path.to_path_buf(),
             json_item,
             controls,
+            xdg_dirs,
         }
     }
 
@@ -133,24 +149,33 @@ impl App {
             }
         };
         self.source.clone_from(&item.metadata.source);
-        self.set_metadata();
 
         if let Some(picker) = picker.as_mut() {
             let bg_hashes = &self.json_item[self.idx].bg_hashes;
             // randomly choose one
             let bg_hash = bg_hashes.choose(&mut rand::thread_rng()).unwrap();
-            self.bg_img = picker.new_resize_protocol(
-                image::io::Reader::open(get_file_path(
-                    &self.osu_path,
-                    bg_hash,
-                ))
+            let image = image::io::Reader::open(get_file_path(&self.osu_path, bg_hash))
                 .unwrap()
                 .with_guessed_format()
                 .unwrap()
                 .decode()
-                .unwrap(),
-            );
+                .unwrap()
+                .to_rgb8();
+            // check if we shall generate a cover...
+            let cache_filename = format!("{}.cover.jpg", bg_hash);
+            let cache_path = self.xdg_dirs.place_cache_file(cache_filename).unwrap();
+            if !cache_path.exists() {
+                let cover = center_largest_square_crop(&image);
+                cover
+                    .to_image()
+                    .save_with_format(cache_path.clone(), image::ImageFormat::Jpeg)
+                    .unwrap();
+            }
+            self.cover_path = Some(cache_path);
+
+            self.bg_img = picker.new_resize_protocol(image::DynamicImage::ImageRgb8(image));
         }
+        self.set_metadata();
     }
 
     fn update_progress(&mut self, progress: f64) {
@@ -190,7 +215,11 @@ impl App {
                 artist: Some(&self.artist),
                 album: Some(&self.source),
                 duration: Some(Duration::from_secs_f64(self.total)),
-                ..Default::default()
+                cover_url: self
+                    .cover_path
+                    .as_ref()
+                    .map(|p| Url::from_file_path(p).unwrap().to_string())
+                    .as_deref(),
             })
             .unwrap();
     }
@@ -226,11 +255,24 @@ impl App {
     }
 }
 
+#[derive(Parser, Debug)]
+struct Cli {
+    /// Path to RealmHashExtractor's generated JSON file
+    json_file: PathBuf,
+
+    /// Path to osu! files directory
+    osu_path: PathBuf,
+}
+
 fn main() {
-    let json_file = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
-    let osu_path = PathBuf::from(std::env::args().nth(2).unwrap());
+    // let json_file = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
+    // let osu_path = PathBuf::from(std::env::args().nth(2).unwrap());
+    let args = Cli::parse();
+    let json_file = std::fs::read_to_string(&args.json_file).unwrap();
     let mut json_item: Vec<JsonItem> = serde_json::from_str(&json_file).unwrap();
     json_item.shuffle(&mut rand::thread_rng());
+
+    let xdg_dirs = xdg::BaseDirectories::with_prefix("osu-player-tools").unwrap();
 
     stdout().execute(EnterAlternateScreen).unwrap();
     enable_raw_mode().unwrap();
@@ -335,7 +377,7 @@ fn main() {
         })
         .unwrap();
 
-    let mut app = App::new(picker, controls, &osu_path, json_item);
+    let mut app = App::new(picker, controls, &args.osu_path, json_item, xdg_dirs);
 
     app.open(mpv_control_tx.clone());
     app.update_metadata(Some(picker));
