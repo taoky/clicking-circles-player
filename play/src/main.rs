@@ -1,6 +1,6 @@
 use clap::Parser;
 use crossterm::{
-    event,
+    event::{self},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
@@ -13,7 +13,8 @@ use rand::prelude::SliceRandom;
 use ratatui::{
     backend::CrosstermBackend,
     layout::Layout,
-    widgets::{Block, Borders, Paragraph},
+    style::{Modifier, Style},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Terminal,
 };
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
@@ -25,6 +26,7 @@ use std::{
     sync::mpsc,
     time::Duration,
 };
+use tui_input::backend::crossterm::EventHandler;
 use url::Url;
 
 enum InternalEvent {
@@ -74,6 +76,36 @@ fn center_largest_square_crop<I: GenericImageView>(img: &I) -> image::SubImage<&
     crop_imm(img, x, y, side_len, side_len)
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum UIState {
+    Main,
+    Search,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum InputMode {
+    Normal,
+    Editing,
+}
+
+struct SearchState {
+    input: tui_input::Input,
+    input_mode: InputMode,
+    results: Vec<usize>,
+    list_state: ListState,
+}
+
+impl Default for SearchState {
+    fn default() -> Self {
+        Self {
+            input: tui_input::Input::default(),
+            input_mode: InputMode::Editing,
+            results: Vec::new(),
+            list_state: ListState::default(),
+        }
+    }
+}
+
 struct App {
     progress: f64,
     total: f64,
@@ -89,6 +121,9 @@ struct App {
     json_item: Vec<JsonItem>,
     controls: MediaControls,
     xdg_dirs: xdg::BaseDirectories,
+    ui_state: UIState,
+    should_exit: bool,
+    search_state: SearchState,
 }
 
 impl App {
@@ -114,6 +149,9 @@ impl App {
             json_item,
             controls,
             xdg_dirs,
+            ui_state: UIState::Main,
+            should_exit: false,
+            search_state: SearchState::default(),
         }
     }
 
@@ -252,6 +290,222 @@ impl App {
             mpv_control_tx.send(InternalControl::Play).unwrap();
         }
         self.set_playback();
+    }
+
+    fn search(&self, query: &str) -> Vec<usize> {
+        let mut result = Vec::new();
+        for (i, item) in self.json_item.iter().enumerate() {
+            if item.metadata.title.contains(query) || item.metadata.artist.contains(query) {
+                result.push(i);
+            }
+        }
+        result
+    }
+}
+
+fn main_ui<B>(
+    terminal: &mut Terminal<B>,
+    app: &mut App,
+    mpv_control_tx: mpsc::Sender<InternalControl>,
+    picker: Picker,
+) where
+    B: ratatui::backend::Backend,
+{
+    terminal
+        .draw(|frame| {
+            let outer_block = Block::default()
+                .title("osu! player tools")
+                .borders(Borders::TOP);
+            let chunks = Layout::default()
+                .direction(ratatui::layout::Direction::Vertical)
+                .margin(1)
+                .constraints(
+                    [
+                        ratatui::layout::Constraint::Percentage(10),
+                        ratatui::layout::Constraint::Percentage(90),
+                    ]
+                    .as_ref(),
+                )
+                .split(outer_block.inner(frame.size()));
+            frame.render_widget(outer_block, frame.size());
+            frame.render_widget(
+                Paragraph::new(format!(
+                    "{} - {} {:.1} / {:.1} (paused? {})",
+                    app.title, app.artist, app.progress, app.total, app.paused
+                )),
+                chunks[0],
+            );
+            let imgw = StatefulImage::new(None);
+            frame.render_stateful_widget(imgw, chunks[1], &mut app.bg_img);
+        })
+        .unwrap();
+    if event::poll(std::time::Duration::from_millis(16)).unwrap() {
+        if let event::Event::Key(key_event) = event::read().unwrap() {
+            if key_event.code == event::KeyCode::Char('q') {
+                mpv_control_tx.send(InternalControl::Quit).unwrap();
+                app.should_exit = true;
+                return;
+            }
+            if key_event.code == event::KeyCode::Char(' ') {
+                app.set_paused(!app.paused, mpv_control_tx.clone());
+            }
+            if key_event.code == event::KeyCode::Char('>') {
+                app.next_idx();
+                app.open(mpv_control_tx.clone());
+                app.update_metadata(Some(picker));
+            }
+            if key_event.code == event::KeyCode::Char('<') {
+                app.prev_idx();
+                app.open(mpv_control_tx.clone());
+                app.update_metadata(Some(picker));
+            }
+            if key_event.code == event::KeyCode::Char('u') {
+                app.toggle_unicode();
+            }
+            if key_event.code == event::KeyCode::Left {
+                mpv_control_tx
+                    .send(InternalControl::Seek(app.progress - 5.0))
+                    .unwrap();
+            }
+            if key_event.code == event::KeyCode::Right {
+                mpv_control_tx
+                    .send(InternalControl::Seek(app.progress + 5.0))
+                    .unwrap();
+            }
+            if key_event.code == event::KeyCode::Char('s') {
+                app.ui_state = UIState::Search;
+            }
+        }
+    }
+}
+
+fn search_ui<B>(
+    terminal: &mut Terminal<B>,
+    app: &mut App,
+    mpv_control_tx: mpsc::Sender<InternalControl>,
+    picker: Picker,
+) where
+    B: ratatui::backend::Backend,
+{
+    terminal
+        .draw(|frame| {
+            let outer_block = Block::default().title("searching...").borders(Borders::TOP);
+            let chunks = Layout::default()
+                .direction(ratatui::layout::Direction::Vertical)
+                .margin(1)
+                .constraints(
+                    [
+                        ratatui::layout::Constraint::Length(3),
+                        ratatui::layout::Constraint::Min(3),
+                    ]
+                    .as_ref(),
+                )
+                .split(outer_block.inner(frame.size()));
+            frame.render_widget(outer_block, frame.size());
+            let width = chunks[0].width.max(3) - 3;
+            let scroll = app.search_state.input.visual_scroll(width as usize);
+            let input = Paragraph::new(app.search_state.input.value())
+                .style(match app.search_state.input_mode {
+                    InputMode::Normal => Style::default(),
+                    InputMode::Editing => Style::default().fg(ratatui::style::Color::Yellow),
+                })
+                .scroll((0, scroll as u16))
+                .block(Block::default().borders(Borders::ALL).title("Search"));
+            frame.render_widget(input, chunks[0]);
+            if app.search_state.input_mode == InputMode::Editing {
+                frame.set_cursor(
+                    chunks[0].x
+                        + 1
+                        + (app.search_state.input.visual_cursor().max(scroll) - scroll) as u16,
+                    chunks[0].y + 1,
+                );
+            }
+            let items: Vec<ListItem> = app
+                .search_state
+                .results
+                .iter()
+                .map(|&i| {
+                    ListItem::new(format!(
+                        "{} - {}",
+                        app.json_item[i].metadata.title, app.json_item[i].metadata.artist
+                    ))
+                })
+                .collect();
+            let items = List::new(items)
+                .block(Block::default().borders(Borders::ALL).title("Results"))
+                .highlight_style(
+                    Style::default()
+                        .add_modifier(Modifier::BOLD)
+                        .add_modifier(Modifier::BOLD)
+                        .fg(ratatui::style::Color::Yellow),
+                )
+                .highlight_symbol(">")
+                .highlight_spacing(ratatui::widgets::HighlightSpacing::Always);
+            // frame.render_widget(items, chunks[1]);
+            frame.render_stateful_widget(items, chunks[1], &mut app.search_state.list_state);
+        })
+        .unwrap();
+    if event::poll(std::time::Duration::from_millis(16)).unwrap() {
+        if let event::Event::Key(key_event) = event::read().unwrap() {
+            match app.search_state.input_mode {
+                InputMode::Normal => {
+                    if key_event.code == event::KeyCode::Up {
+                        let i = match app.search_state.list_state.selected() {
+                            Some(i) => {
+                                if i == 0 {
+                                    app.search_state.results.len() - 1
+                                } else {
+                                    i - 1
+                                }
+                            }
+                            None => 0,
+                        };
+                        app.search_state.list_state.select(Some(i));
+                    }
+                    if key_event.code == event::KeyCode::Down {
+                        let i = match app.search_state.list_state.selected() {
+                            Some(i) => {
+                                if i == app.search_state.results.len() - 1 {
+                                    0
+                                } else {
+                                    i + 1
+                                }
+                            }
+                            None => 0,
+                        };
+                        app.search_state.list_state.select(Some(i));
+                    }
+                    if key_event.code == event::KeyCode::Esc {
+                        app.search_state.input_mode = InputMode::Editing;
+                    }
+                    if key_event.code == event::KeyCode::Enter {
+                        if let Some(i) = app.search_state.list_state.selected() {
+                            app.idx = app.search_state.results[i];
+                            app.open(mpv_control_tx.clone());
+                            app.update_metadata(Some(picker));
+                            app.ui_state = UIState::Main;
+                        }
+                    }
+                }
+                InputMode::Editing => match key_event.code {
+                    event::KeyCode::Esc => {
+                        app.ui_state = UIState::Main;
+                    }
+                    event::KeyCode::Enter => {
+                        app.search_state.results = app.search(app.search_state.input.value());
+                        if !app.search_state.results.is_empty() {
+                            app.search_state.list_state.select(Some(0));
+                        }
+                        app.search_state.input_mode = InputMode::Normal;
+                    }
+                    _ => {
+                        app.search_state
+                            .input
+                            .handle_event(&crossterm::event::Event::Key(key_event));
+                    }
+                },
+            }
+        }
     }
 }
 
@@ -398,67 +652,14 @@ fn main() {
                 }
             }
         }
-        terminal
-            .draw(|frame| {
-                let outer_block = Block::default()
-                    .title("osu! player tools")
-                    .borders(Borders::TOP);
-                let chunks = Layout::default()
-                    .direction(ratatui::layout::Direction::Vertical)
-                    .margin(1)
-                    .constraints(
-                        [
-                            ratatui::layout::Constraint::Percentage(10),
-                            ratatui::layout::Constraint::Percentage(90),
-                        ]
-                        .as_ref(),
-                    )
-                    .split(outer_block.inner(frame.size()));
-                frame.render_widget(outer_block, frame.size());
-                frame.render_widget(
-                    Paragraph::new(format!(
-                        "{} - {} {:.1} / {:.1} (paused? {})",
-                        app.title, app.artist, app.progress, app.total, app.paused
-                    )),
-                    chunks[0],
-                );
-                let imgw = StatefulImage::new(None);
-                frame.render_stateful_widget(imgw, chunks[1], &mut app.bg_img);
-            })
-            .unwrap();
-        if event::poll(std::time::Duration::from_millis(16)).unwrap() {
-            if let event::Event::Key(key_event) = event::read().unwrap() {
-                if key_event.code == event::KeyCode::Char('q') {
-                    mpv_control_tx.send(InternalControl::Quit).unwrap();
-                    break;
-                }
-                if key_event.code == event::KeyCode::Char(' ') {
-                    app.set_paused(!app.paused, mpv_control_tx.clone());
-                }
-                if key_event.code == event::KeyCode::Char('>') {
-                    app.next_idx();
-                    app.open(mpv_control_tx.clone());
-                    app.update_metadata(Some(picker));
-                }
-                if key_event.code == event::KeyCode::Char('<') {
-                    app.prev_idx();
-                    app.open(mpv_control_tx.clone());
-                    app.update_metadata(Some(picker));
-                }
-                if key_event.code == event::KeyCode::Char('u') {
-                    app.toggle_unicode();
-                }
-                if key_event.code == event::KeyCode::Left {
-                    mpv_control_tx
-                        .send(InternalControl::Seek(app.progress - 5.0))
-                        .unwrap();
-                }
-                if key_event.code == event::KeyCode::Right {
-                    mpv_control_tx
-                        .send(InternalControl::Seek(app.progress + 5.0))
-                        .unwrap();
-                }
-            }
+        if app.ui_state == UIState::Main {
+            main_ui(&mut terminal, &mut app, mpv_control_tx.clone(), picker);
+        } else {
+            search_ui(&mut terminal, &mut app, mpv_control_tx.clone(), picker);
+        }
+
+        if app.should_exit {
+            break;
         }
 
         for event in souvlaki_rx.try_iter() {

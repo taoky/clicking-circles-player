@@ -14,5 +14,6 @@ ratatui-image = "1.0.1"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.117"
 souvlaki = { version = "0.7.3", default-features = false, features = ["use_zbus"] }
+tui-input = "0.8.0"
 url = "2.5.2"
 xdg = "2.5.2"

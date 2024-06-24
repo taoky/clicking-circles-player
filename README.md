@@ -10,7 +10,7 @@ Some very simple and dirty tools for playing osu! songs in terminal.
 - [x] Code cleanup (currently it is done rushy and messy).
 - [x] Show correct metadata in mpris.
 - [x] TUI support.
-- [ ] Search.
+- [x] Search.
 
 ## How to use
 
@@ -39,6 +39,8 @@ target/release/play ../song.json ~/.var/app/sh.ppy.osu/data/osu/files/
 - u: toggle unicode mode
 - (left): seek backward 5s
 - (right): seek forward 5s
+- s: search mode
+    - ESC: exit search mode
 
 #### Screenshots
 
@@ -51,6 +53,10 @@ Based on [ratatui-image](https://github.com/benjajaja/ratatui-image/), it could 
 ![in Tilix](assets/tilix-1.png)
 
 (Tilix)
+
+![Search](assets/kitty-search-1.png)
+
+Search mode.
 
 ### archive/play.py
 
