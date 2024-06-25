@@ -124,6 +124,7 @@ struct App {
     xdg_dirs: xdg::BaseDirectories,
     ui_state: UIState,
     search_state: SearchState,
+    repeat: bool,
 }
 
 impl App {
@@ -151,6 +152,7 @@ impl App {
             xdg_dirs,
             ui_state: UIState::Main,
             search_state: SearchState::default(),
+            repeat: false,
         }
     }
 
@@ -348,8 +350,13 @@ fn main_ui<B>(
             frame.render_widget(outer_block, frame.size());
             frame.render_widget(
                 Paragraph::new(format!(
-                    "{} - {} {:.1} / {:.1} (paused? {})",
-                    app.title, app.artist, app.progress, app.total, app.paused
+                    "{} - {} {:.1} / {:.1} ({}{})",
+                    app.title,
+                    app.artist,
+                    app.progress,
+                    app.total,
+                    if app.paused { "paused" } else { "playing" },
+                    if app.repeat { " repeat" } else { "" }
                 )),
                 chunks[0],
             );
@@ -378,6 +385,9 @@ fn main_ui<B>(
                 }
                 event::KeyCode::Char('u') => {
                     app.toggle_unicode();
+                }
+                event::KeyCode::Char('r') => {
+                    app.repeat = !app.repeat;
                 }
                 event::KeyCode::Left => {
                     mpv_control_tx
@@ -511,7 +521,7 @@ fn search_ui<B>(
                         app.search_state.list_state.select(Some(i));
                     }
                     event::KeyCode::Char('u') => {
-                        app.is_unicode = !app.is_unicode;
+                        app.toggle_unicode();
                     }
                     event::KeyCode::Esc => {
                         app.search_state.input_mode = InputMode::Editing;
@@ -685,7 +695,9 @@ fn main() {
                     app.update_progress(time);
                 }
                 InternalEvent::Eof => {
-                    app.next_idx();
+                    if !app.repeat {
+                        app.next_idx();
+                    }
                     app.open(mpv_control_tx.clone());
                     app.update_metadata(Some(picker));
                 }

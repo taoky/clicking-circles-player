@@ -41,6 +41,7 @@ target/release/play ../song.json ~/.var/app/sh.ppy.osu/data/osu/files/
 - (right): seek forward 5s
 - s: search mode
     - ESC: exit search mode
+- r: toggle repeat mode
 
 #### Screenshots
 
