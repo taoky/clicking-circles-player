@@ -33,6 +33,7 @@ enum InternalEvent {
     Pos(f64),
     Duration(f64),
     Eof,
+    Quit,
 }
 
 enum InternalControl {
@@ -122,7 +123,6 @@ struct App {
     controls: MediaControls,
     xdg_dirs: xdg::BaseDirectories,
     ui_state: UIState,
-    should_exit: bool,
     search_state: SearchState,
 }
 
@@ -150,7 +150,6 @@ impl App {
             controls,
             xdg_dirs,
             ui_state: UIState::Main,
-            should_exit: false,
             search_state: SearchState::default(),
         }
     }
@@ -343,7 +342,6 @@ fn main_ui<B>(
         if let event::Event::Key(key_event) = event::read().unwrap() {
             if key_event.code == event::KeyCode::Char('q') {
                 mpv_control_tx.send(InternalControl::Quit).unwrap();
-                app.should_exit = true;
                 return;
             }
             if key_event.code == event::KeyCode::Char(' ') {
@@ -623,6 +621,7 @@ fn main() {
                         }
                         InternalControl::Quit => {
                             mpv.command("quit", &[]).unwrap();
+                            mpv_event_tx.send(InternalEvent::Quit).unwrap();
                             break;
                         }
                     }
@@ -650,16 +649,15 @@ fn main() {
                 InternalEvent::Duration(duration) => {
                     app.update_duration(duration);
                 }
+                InternalEvent::Quit => {
+                    break;
+                }
             }
         }
         if app.ui_state == UIState::Main {
             main_ui(&mut terminal, &mut app, mpv_control_tx.clone(), picker);
         } else {
             search_ui(&mut terminal, &mut app, mpv_control_tx.clone(), picker);
-        }
-
-        if app.should_exit {
-            break;
         }
 
         for event in souvlaki_rx.try_iter() {
