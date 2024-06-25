@@ -340,38 +340,41 @@ fn main_ui<B>(
         .unwrap();
     if event::poll(std::time::Duration::from_millis(16)).unwrap() {
         if let event::Event::Key(key_event) = event::read().unwrap() {
-            if key_event.code == event::KeyCode::Char('q') {
-                mpv_control_tx.send(InternalControl::Quit).unwrap();
-                return;
-            }
-            if key_event.code == event::KeyCode::Char(' ') {
-                app.set_paused(!app.paused, mpv_control_tx.clone());
-            }
-            if key_event.code == event::KeyCode::Char('>') {
-                app.next_idx();
-                app.open(mpv_control_tx.clone());
-                app.update_metadata(Some(picker));
-            }
-            if key_event.code == event::KeyCode::Char('<') {
-                app.prev_idx();
-                app.open(mpv_control_tx.clone());
-                app.update_metadata(Some(picker));
-            }
-            if key_event.code == event::KeyCode::Char('u') {
-                app.toggle_unicode();
-            }
-            if key_event.code == event::KeyCode::Left {
-                mpv_control_tx
-                    .send(InternalControl::Seek(app.progress - 5.0))
-                    .unwrap();
-            }
-            if key_event.code == event::KeyCode::Right {
-                mpv_control_tx
-                    .send(InternalControl::Seek(app.progress + 5.0))
-                    .unwrap();
-            }
-            if key_event.code == event::KeyCode::Char('s') {
-                app.ui_state = UIState::Search;
+            match key_event.code {
+                event::KeyCode::Char('q') => {
+                    mpv_control_tx.send(InternalControl::Quit).unwrap();
+                    return;
+                }
+                event::KeyCode::Char(' ') => {
+                    app.set_paused(!app.paused, mpv_control_tx.clone());
+                }
+                event::KeyCode::Char('>') => {
+                    app.next_idx();
+                    app.open(mpv_control_tx.clone());
+                    app.update_metadata(Some(picker));
+                }
+                event::KeyCode::Char('<') => {
+                    app.prev_idx();
+                    app.open(mpv_control_tx.clone());
+                    app.update_metadata(Some(picker));
+                }
+                event::KeyCode::Char('u') => {
+                    app.toggle_unicode();
+                }
+                event::KeyCode::Left => {
+                    mpv_control_tx
+                        .send(InternalControl::Seek(app.progress - 5.0))
+                        .unwrap();
+                }
+                event::KeyCode::Right => {
+                    mpv_control_tx
+                        .send(InternalControl::Seek(app.progress + 5.0))
+                        .unwrap();
+                }
+                event::KeyCode::Char('s') => {
+                    app.ui_state = UIState::Search;
+                }
+                _ => {}
             }
         }
     }
@@ -385,6 +388,7 @@ fn search_ui<B>(
 ) where
     B: ratatui::backend::Backend,
 {
+    let mut list_height = 1;
     terminal
         .draw(|frame| {
             let outer_block = Block::default().title("searching...").borders(Borders::TOP);
@@ -441,42 +445,57 @@ fn search_ui<B>(
                 .highlight_spacing(ratatui::widgets::HighlightSpacing::Always);
             // frame.render_widget(items, chunks[1]);
             frame.render_stateful_widget(items, chunks[1], &mut app.search_state.list_state);
+            list_height = (chunks[1].height - 2).max(1);
         })
         .unwrap();
     if event::poll(std::time::Duration::from_millis(16)).unwrap() {
         if let event::Event::Key(key_event) = event::read().unwrap() {
+            fn previous(current: usize, total: usize, offset: usize) -> usize {
+                (current + total - (offset % total)) % total
+            }
+
+            fn next(current: usize, total: usize, offset: usize) -> usize {
+                (current + offset) % total
+            }
+
             match app.search_state.input_mode {
-                InputMode::Normal => {
-                    if key_event.code == event::KeyCode::Up {
-                        let i = match app.search_state.list_state.selected() {
-                            Some(i) => {
-                                if i == 0 {
-                                    app.search_state.results.len() - 1
-                                } else {
-                                    i - 1
-                                }
-                            }
-                            None => 0,
-                        };
+                InputMode::Normal => match key_event.code {
+                    event::KeyCode::Up => {
+                        let i = previous(
+                            app.search_state.list_state.selected().unwrap_or(0),
+                            app.search_state.results.len(),
+                            1,
+                        );
                         app.search_state.list_state.select(Some(i));
                     }
-                    if key_event.code == event::KeyCode::Down {
-                        let i = match app.search_state.list_state.selected() {
-                            Some(i) => {
-                                if i == app.search_state.results.len() - 1 {
-                                    0
-                                } else {
-                                    i + 1
-                                }
-                            }
-                            None => 0,
-                        };
+                    event::KeyCode::Down => {
+                        let i = next(
+                            app.search_state.list_state.selected().unwrap_or(0),
+                            app.search_state.results.len(),
+                            1,
+                        );
                         app.search_state.list_state.select(Some(i));
                     }
-                    if key_event.code == event::KeyCode::Esc {
+                    event::KeyCode::PageUp => {
+                        let i = previous(
+                            app.search_state.list_state.selected().unwrap_or(0),
+                            app.search_state.results.len(),
+                            list_height.into(),
+                        );
+                        app.search_state.list_state.select(Some(i));
+                    }
+                    event::KeyCode::PageDown => {
+                        let i = next(
+                            app.search_state.list_state.selected().unwrap_or(0),
+                            app.search_state.results.len(),
+                            list_height.into(),
+                        );
+                        app.search_state.list_state.select(Some(i));
+                    }
+                    event::KeyCode::Esc => {
                         app.search_state.input_mode = InputMode::Editing;
                     }
-                    if key_event.code == event::KeyCode::Enter {
+                    event::KeyCode::Enter => {
                         if let Some(i) = app.search_state.list_state.selected() {
                             app.idx = app.search_state.results[i];
                             app.open(mpv_control_tx.clone());
@@ -484,7 +503,8 @@ fn search_ui<B>(
                             app.ui_state = UIState::Main;
                         }
                     }
-                }
+                    _ => {}
+                },
                 InputMode::Editing => match key_event.code {
                     event::KeyCode::Esc => {
                         app.ui_state = UIState::Main;
