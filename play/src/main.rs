@@ -163,9 +163,8 @@ impl App {
             .unwrap();
     }
 
-    fn update_metadata(&mut self, mut picker: Option<ratatui_image::picker::Picker>) {
-        let item = &self.json_item[self.idx];
-        self.title = if !self.is_unicode {
+    fn get_title(&self, item: &JsonItem) -> String {
+        if !self.is_unicode {
             item.metadata.title.clone()
         } else {
             let u = item.metadata.title_unicode.clone();
@@ -174,8 +173,11 @@ impl App {
             } else {
                 u
             }
-        };
-        self.artist = if !self.is_unicode {
+        }
+    }
+
+    fn get_artist(&self, item: &JsonItem) -> String {
+        if !self.is_unicode {
             item.metadata.artist.clone()
         } else {
             let u = item.metadata.artist_unicode.clone();
@@ -184,7 +186,13 @@ impl App {
             } else {
                 u
             }
-        };
+        }
+    }
+
+    fn update_metadata(&mut self, mut picker: Option<ratatui_image::picker::Picker>) {
+        let item = &self.json_item[self.idx];
+        self.title = self.get_title(item);
+        self.artist = self.get_artist(item);
         self.source.clone_from(&item.metadata.source);
 
         if let Some(picker) = picker.as_mut() {
@@ -293,12 +301,23 @@ impl App {
 
     fn search(&self, query: &str) -> Vec<usize> {
         let mut result = Vec::new();
+        let query = query.to_lowercase();
         for (i, item) in self.json_item.iter().enumerate() {
-            if item.metadata.title.contains(query) || item.metadata.artist.contains(query) {
+            if item.metadata.title.to_ascii_lowercase().contains(&query)
+                || item.metadata.artist.to_ascii_lowercase().contains(&query)
+                || item.metadata.source.to_lowercase().contains(&query)
+                || item.metadata.title_unicode.to_lowercase().contains(&query)
+                || item.metadata.artist_unicode.to_lowercase().contains(&query)
+            {
                 result.push(i);
             }
         }
         result
+    }
+
+    fn item_to_string(&self, i: usize) -> String {
+        let item = &self.json_item[i];
+        format!("{} - {}", self.get_title(item), self.get_artist(item))
     }
 }
 
@@ -343,7 +362,6 @@ fn main_ui<B>(
             match key_event.code {
                 event::KeyCode::Char('q') => {
                     mpv_control_tx.send(InternalControl::Quit).unwrap();
-                    return;
                 }
                 event::KeyCode::Char(' ') => {
                     app.set_paused(!app.paused, mpv_control_tx.clone());
@@ -426,15 +444,15 @@ fn search_ui<B>(
                 .search_state
                 .results
                 .iter()
-                .map(|&i| {
-                    ListItem::new(format!(
-                        "{} - {}",
-                        app.json_item[i].metadata.title, app.json_item[i].metadata.artist
-                    ))
-                })
+                .map(|&i| ListItem::new(app.item_to_string(i)))
                 .collect();
+            let items_title = if let Some(idx) = app.search_state.list_state.selected() {
+                format!("Results ({}/{})", idx + 1, items.len())
+            } else {
+                "Results".to_string()
+            };
             let items = List::new(items)
-                .block(Block::default().borders(Borders::ALL).title("Results"))
+                .block(Block::default().borders(Borders::ALL).title(items_title))
                 .highlight_style(
                     Style::default()
                         .add_modifier(Modifier::BOLD)
@@ -492,6 +510,9 @@ fn search_ui<B>(
                         );
                         app.search_state.list_state.select(Some(i));
                     }
+                    event::KeyCode::Char('u') => {
+                        app.is_unicode = !app.is_unicode;
+                    }
                     event::KeyCode::Esc => {
                         app.search_state.input_mode = InputMode::Editing;
                     }
@@ -513,6 +534,8 @@ fn search_ui<B>(
                         app.search_state.results = app.search(app.search_state.input.value());
                         if !app.search_state.results.is_empty() {
                             app.search_state.list_state.select(Some(0));
+                        } else {
+                            app.search_state.list_state.select(None);
                         }
                         app.search_state.input_mode = InputMode::Normal;
                     }
