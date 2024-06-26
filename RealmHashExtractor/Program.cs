@@ -1,15 +1,21 @@
 ﻿// CollectionDowngrader.LazerSchema from https://github.com/ookiineko/CollectionDowngrader/tree/main/LazerSchema
 using CollectionDowngrader.LazerSchema;
+using CommandLine;
 using Realms;
 using System.Text.Json;
 
-if (args.Length < 1)
-{
-    Console.WriteLine("Please provide path to realm file as argument");
-    return;
-}
+string? realmFile = null;
+List<string> user_collections = [];
+Parser.Default.ParseArguments<CliOptions>(args)
+    .WithParsed<CliOptions>(o =>
+    {
+        realmFile = o.RealmFile;
+        if (o.Collections != null)
+        {
+            user_collections = o.Collections.ToList();
+        }
+    });
 
-string realmFile = Path.GetFullPath(args[0]);
 if (!File.Exists(realmFile))
 {
     Console.WriteLine($"File not found: {realmFile}");
@@ -38,6 +44,10 @@ RealmConfiguration config = new(realmFile)
 
 Realm db = Realm.GetInstance(config);
 List<BeatmapCollection> collections = [.. db.All<BeatmapCollection>()];
+if (user_collections.Count > 0)
+{
+    collections = collections.Where(c => user_collections.Contains(c.Name)).ToList();
+}
 Console.Error.WriteLine($"Loaded {collections.Count} collections");
 
 Dictionary<(string, string), BeatmapCleanMetadata> beatmapsByAudioBGFiles = [];
@@ -47,7 +57,6 @@ foreach (BeatmapCollection collection in collections)
     Console.Error.WriteLine($"Collection: {collection.Name}, with {collection.BeatmapMD5Hashes.Count} difficulties");
     foreach (string hash in collection.BeatmapMD5Hashes)
     {
-        // Console.WriteLine($"  {hash}");
         // Search for the beatmap with this hash
         var beatmaps = db.All<Beatmap>().Where(b => b.MD5Hash == hash).ToList();
         foreach (Beatmap beatmap in beatmaps)
@@ -56,8 +65,6 @@ foreach (BeatmapCollection collection in collections)
             {
                 continue;
             }
-            // Console.WriteLine($"    Beatmap: {beatmap.Metadata.Artist} - {beatmap.Metadata.Title} [{beatmap.DifficultyName}] {beatmap.MD5Hash}");
-            // Console.WriteLine($"      Audio: {beatmap.Metadata.AudioFile}, BG: {beatmap.Metadata.BackgroundFile}");
             var audioName = beatmap.Metadata.AudioFile;
             string? audioHash = null;
             var bgName = beatmap.Metadata.BackgroundFile;
@@ -67,15 +74,12 @@ foreach (BeatmapCollection collection in collections)
             {
                 if (file.Filename == audioName)
                 {
-                    // Console.WriteLine($"      Audio: {file.Filename} ({file.File.Hash})");
                     audioHash = file.File.Hash;
                 }
                 if (file.Filename == bgName)
                 {
-                    // Console.WriteLine($"      BG: {file.Filename} ({file.File.Hash})");
                     bgHash = file.File.Hash;
                 }
-                // Console.WriteLine($"      File: {file.Filename} ({file.File.Hash})");
             }
             if (audioHash == null || bgHash == null)
             {
@@ -108,10 +112,6 @@ Dictionary<string, BeatmapFileMetadataInfo> beatmapFileMetadataInfos = [];
 
 foreach (var pair in beatmapsByAudioBGFiles)
 {
-    // var (audioHash, bgHash) = pair.Key;
-    // var beatmaps = pair.Value;
-    // Console.WriteLine($"{beatmaps.Artist} - {beatmaps.Title}");
-    // Console.WriteLine($"  Audio: {audioHash}, BG: {bgHash}");
     var audioHash = pair.Key.Item1;
     var bgHash = pair.Key.Item2;
     var metadata = pair.Value;
@@ -139,6 +139,15 @@ foreach (var pair in beatmapsByAudioBGFiles)
 string jsonString = JsonSerializer.Serialize(beatmapFileMetadataInfos.Values);
 Console.WriteLine(jsonString);
 
+
+class CliOptions
+{
+    [Option('c', "collection", Required = false, HelpText = "Collection name. If not provided, all collections will be processed. Songs not in any collection will be ignored.")]
+    public IEnumerable<string>? Collections { get; set; }
+
+    [Value(0, MetaName = "RealmFile", Required = true, HelpText = "Path to realm file")]
+    public required string RealmFile { get; set; }
+}
 
 struct BeatmapCleanMetadata
 {
