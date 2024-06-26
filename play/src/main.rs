@@ -14,7 +14,7 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::Layout,
     style::{Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    widgets::{block::Title, Block, Borders, List, ListItem, ListState, Paragraph},
     Terminal,
 };
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
@@ -335,6 +335,10 @@ fn main_ui<B>(
         .draw(|frame| {
             let outer_block = Block::default()
                 .title("osu! player tools")
+                .title(
+                    Title::from(format!("{}/{}", app.idx + 1, app.json_item.len()))
+                        .alignment(ratatui::layout::Alignment::Right),
+                )
                 .borders(Borders::TOP);
             let chunks = Layout::default()
                 .direction(ratatui::layout::Direction::Vertical)
@@ -462,7 +466,15 @@ fn search_ui<B>(
                 "Results".to_string()
             };
             let items = List::new(items)
-                .block(Block::default().borders(Borders::ALL).title(items_title))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(items_title)
+                        .border_style(match app.search_state.input_mode {
+                            InputMode::Normal => Style::default().fg(ratatui::style::Color::Yellow),
+                            InputMode::Editing => Style::default(),
+                        }),
+                )
                 .highlight_style(
                     Style::default()
                         .add_modifier(Modifier::BOLD)
@@ -478,18 +490,34 @@ fn search_ui<B>(
         .unwrap();
     if event::poll(std::time::Duration::from_millis(16)).unwrap() {
         if let event::Event::Key(key_event) = event::read().unwrap() {
-            fn previous(current: usize, total: usize, offset: usize) -> usize {
-                (current + total - (offset % total)) % total
+            fn previous(current: usize, offset: usize) -> usize {
+                if offset > current {
+                    0
+                } else {
+                    current - offset
+                }
             }
 
             fn next(current: usize, total: usize, offset: usize) -> usize {
+                if current + offset >= total {
+                    total - 1
+                } else {
+                    current + offset
+                }
+            }
+
+            fn circular_previous(current: usize, total: usize, offset: usize) -> usize {
+                (current + total - (offset % total)) % total
+            }
+
+            fn circular_next(current: usize, total: usize, offset: usize) -> usize {
                 (current + offset) % total
             }
 
             match app.search_state.input_mode {
                 InputMode::Normal => match key_event.code {
                     event::KeyCode::Up => {
-                        let i = previous(
+                        let i = circular_previous(
                             app.search_state.list_state.selected().unwrap_or(0),
                             app.search_state.results.len(),
                             1,
@@ -497,7 +525,7 @@ fn search_ui<B>(
                         app.search_state.list_state.select(Some(i));
                     }
                     event::KeyCode::Down => {
-                        let i = next(
+                        let i = circular_next(
                             app.search_state.list_state.selected().unwrap_or(0),
                             app.search_state.results.len(),
                             1,
@@ -507,7 +535,6 @@ fn search_ui<B>(
                     event::KeyCode::PageUp => {
                         let i = previous(
                             app.search_state.list_state.selected().unwrap_or(0),
-                            app.search_state.results.len(),
                             list_height.into(),
                         );
                         app.search_state.list_state.select(Some(i));
@@ -523,7 +550,7 @@ fn search_ui<B>(
                     event::KeyCode::Char('u') => {
                         app.toggle_unicode();
                     }
-                    event::KeyCode::Esc => {
+                    event::KeyCode::Esc | event::KeyCode::Tab => {
                         app.search_state.input_mode = InputMode::Editing;
                     }
                     event::KeyCode::Enter => {
@@ -531,6 +558,7 @@ fn search_ui<B>(
                             app.idx = app.search_state.results[i];
                             app.open(mpv_control_tx.clone());
                             app.update_metadata(Some(picker));
+                            app.set_paused(false, mpv_control_tx.clone());
                             app.ui_state = UIState::Main;
                         }
                     }
@@ -540,7 +568,7 @@ fn search_ui<B>(
                     event::KeyCode::Esc => {
                         app.ui_state = UIState::Main;
                     }
-                    event::KeyCode::Enter => {
+                    event::KeyCode::Enter | event::KeyCode::Tab => {
                         app.search_state.results = app.search(app.search_state.input.value());
                         if !app.search_state.results.is_empty() {
                             app.search_state.list_state.select(Some(0));
