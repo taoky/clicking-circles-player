@@ -14,7 +14,7 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::Layout,
     style::{Modifier, Style},
-    widgets::{block::Title, Block, Borders, List, ListItem, ListState, Paragraph},
+    widgets::{block::Title, Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
     Terminal,
 };
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
@@ -361,7 +361,8 @@ fn main_ui<B>(
                     app.total,
                     if app.paused { "paused" } else { "playing" },
                     if app.repeat { " repeat" } else { "" }
-                )),
+                ))
+                .wrap(Wrap { trim: true }),
                 chunks[0],
             );
             let imgw = StatefulImage::new(None);
