@@ -7,6 +7,7 @@ edition = "2021"
 clap = { version = "4.5.7", features = ["derive"] }
 crossterm = "0.27.0"
 image = "0.25.1"
+keepawake = "0.5.1"
 libmpv-sirno = "=2.0.2-fork.1"
 rand = "0.8.5"
 ratatui = "0.26.3"

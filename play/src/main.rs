@@ -5,6 +5,7 @@ use crossterm::{
     ExecutableCommand,
 };
 use image::{imageops::crop_imm, GenericImageView};
+use keepawake::KeepAwake;
 use libmpv::{
     events::{Event, PropertyData},
     mpv_end_file_reason, Mpv,
@@ -28,6 +29,9 @@ use std::{
 };
 use tui_input::backend::crossterm::EventHandler;
 use url::Url;
+
+const APP_ID: &str = "moe.taoky.osu-player-tools";
+const APP_NAME: &str = "osu-player-tools";
 
 enum InternalEvent {
     Pos(f64),
@@ -107,6 +111,21 @@ impl Default for SearchState {
     }
 }
 
+fn build_awake() -> Result<KeepAwake, keepawake::Error> {
+    keepawake::Builder::default()
+        .display(false)
+        .idle(false)
+        .sleep(true)
+        .app_reverse_domain(APP_ID)
+        .app_name(APP_NAME)
+        .reason("Playing music")
+        .create()
+}
+
+fn build_awake_anyway() -> Option<KeepAwake> {
+    build_awake().ok()
+}
+
 struct App {
     progress: f64,
     total: f64,
@@ -125,6 +144,7 @@ struct App {
     ui_state: UIState,
     search_state: SearchState,
     repeat: bool,
+    awake: Option<KeepAwake>,
 }
 
 impl App {
@@ -153,6 +173,7 @@ impl App {
             ui_state: UIState::Main,
             search_state: SearchState::default(),
             repeat: false,
+            awake: build_awake_anyway(),
         }
     }
 
@@ -294,8 +315,12 @@ impl App {
     fn set_paused(&mut self, paused: bool, mpv_control_tx: mpsc::Sender<InternalControl>) {
         self.paused = paused;
         if self.paused {
+            self.awake = None;
             mpv_control_tx.send(InternalControl::Pause).unwrap();
         } else {
+            if self.awake.is_none() {
+                self.awake = build_awake_anyway();
+            }
             mpv_control_tx.send(InternalControl::Play).unwrap();
         }
         self.set_playback();
@@ -606,7 +631,7 @@ fn main() {
     let mut json_item: Vec<JsonItem> = serde_json::from_str(&json_file).unwrap();
     json_item.shuffle(&mut rand::thread_rng());
 
-    let xdg_dirs = xdg::BaseDirectories::with_prefix("osu-player-tools").unwrap();
+    let xdg_dirs = xdg::BaseDirectories::with_prefix(APP_NAME).unwrap();
 
     stdout().execute(EnterAlternateScreen).unwrap();
     enable_raw_mode().unwrap();
@@ -620,8 +645,8 @@ fn main() {
     mpv.set_property("volume", 100).unwrap();
 
     let souvlaki_config = PlatformConfig {
-        dbus_name: "moe.taoky.osu-player-tools",
-        display_name: "osu-player-tools",
+        dbus_name: APP_ID,
+        display_name: APP_NAME,
         hwnd: None,
     };
     let mut controls = MediaControls::new(souvlaki_config).unwrap();
