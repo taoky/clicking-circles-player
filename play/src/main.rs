@@ -1,7 +1,9 @@
 use clap::Parser;
 use crossterm::{
     event::{self},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{
+        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetTitle,
+    },
     ExecutableCommand,
 };
 use image::{imageops::crop_imm, GenericImageView};
@@ -22,7 +24,7 @@ use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
 use serde::Deserialize;
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, PlatformConfig};
 use std::{
-    io::stdout,
+    io::{self, stdout},
     path::{Path, PathBuf},
     sync::mpsc,
     time::Duration,
@@ -126,6 +128,10 @@ fn build_awake_anyway() -> Option<KeepAwake> {
     build_awake().ok()
 }
 
+fn set_terminal_title(title: &str) {
+    let _ = crossterm::execute!(io::stdout(), SetTitle(title));
+}
+
 struct App {
     progress: f64,
     total: f64,
@@ -145,6 +151,12 @@ struct App {
     search_state: SearchState,
     repeat: bool,
     awake: Option<KeepAwake>,
+}
+
+macro_rules! get_current_item {
+    ($self: expr) => {
+        $self.json_item[$self.idx]
+    };
 }
 
 impl App {
@@ -181,7 +193,7 @@ impl App {
         mpv_control_tx
             .send(InternalControl::Open(get_file_path(
                 &self.osu_path,
-                &self.json_item[self.idx].audio_hash,
+                &get_current_item!(self).audio_hash,
             )))
             .unwrap();
     }
@@ -212,14 +224,27 @@ impl App {
         }
     }
 
+    // fn get_current_item(&self) -> JsonItem {
+    //     self.json_item[self.idx]
+    // }
+
+    fn construct_terminal_title(&self) -> String {
+        format!(
+            "{} - {} {}",
+            APP_NAME,
+            if self.paused { "Paused" } else { "Playing" },
+            self.get_title(&get_current_item!(self))
+        )
+    }
+
     fn update_metadata(&mut self, mut picker: Option<ratatui_image::picker::Picker>) {
-        let item = &self.json_item[self.idx];
+        let item = &get_current_item!(self);
         self.title = self.get_title(item);
         self.artist = self.get_artist(item);
         self.source.clone_from(&item.metadata.source);
 
         if let Some(picker) = picker.as_mut() {
-            let bg_hashes = &self.json_item[self.idx].bg_hashes;
+            let bg_hashes = &get_current_item!(self).bg_hashes;
             // randomly choose one
             let bg_hash = bg_hashes.choose(&mut rand::thread_rng()).unwrap();
             let image = image::io::Reader::open(get_file_path(&self.osu_path, bg_hash))
@@ -269,6 +294,7 @@ impl App {
                 })
                 .unwrap();
         }
+        set_terminal_title(&self.construct_terminal_title());
     }
 
     fn update_duration(&mut self, total: f64) {
@@ -290,6 +316,7 @@ impl App {
                     .as_deref(),
             })
             .unwrap();
+        set_terminal_title(&self.construct_terminal_title());
     }
 
     fn next_idx(&mut self) {
