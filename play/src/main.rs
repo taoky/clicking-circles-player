@@ -4,7 +4,6 @@ use crossterm::{
     terminal::{
         disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetTitle,
     },
-    ExecutableCommand,
 };
 use image::{imageops::crop_imm, GenericImageView};
 use keepawake::KeepAwake;
@@ -24,10 +23,7 @@ use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
 use serde::Deserialize;
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, PlatformConfig};
 use std::{
-    io::{self, stdout},
-    path::{Path, PathBuf},
-    sync::mpsc,
-    time::Duration,
+    io::{self, stdout}, panic::{set_hook, take_hook}, path::{Path, PathBuf}, sync::mpsc, time::Duration
 };
 use tui_input::backend::crossterm::EventHandler;
 use url::Url;
@@ -650,9 +646,29 @@ struct Cli {
     osu_path: PathBuf,
 }
 
+
+pub fn init_tui() -> io::Result<Terminal<impl ratatui::backend::Backend>> {
+    enable_raw_mode()?;
+    crossterm::execute!(stdout(), EnterAlternateScreen)?;
+    Terminal::new(CrosstermBackend::new(stdout()))
+}
+
+pub fn restore_tui() -> io::Result<()> {
+    disable_raw_mode()?;
+    crossterm::execute!(stdout(), LeaveAlternateScreen)?;
+    Ok(())
+}
+
+pub fn init_panic_hook() {
+    let original_hook = take_hook();
+    set_hook(Box::new(move |panic_info| {
+        // intentionally ignore errors here since we're already in a panic
+        let _ = restore_tui();
+        original_hook(panic_info);
+    }));
+}
+
 fn main() {
-    // let json_file = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
-    // let osu_path = PathBuf::from(std::env::args().nth(2).unwrap());
     let args = Cli::parse();
     let json_file = std::fs::read_to_string(&args.json_file).unwrap();
     let mut json_item: Vec<JsonItem> = serde_json::from_str(&json_file).unwrap();
@@ -660,9 +676,8 @@ fn main() {
 
     let xdg_dirs = xdg::BaseDirectories::with_prefix(APP_NAME).unwrap();
 
-    stdout().execute(EnterAlternateScreen).unwrap();
-    enable_raw_mode().unwrap();
-    let mut terminal = Terminal::new(CrosstermBackend::new(stdout())).unwrap();
+    init_panic_hook();
+    let mut terminal = init_tui().unwrap();
     terminal.clear().unwrap();
     let mut picker = Picker::from_termios().unwrap_or(Picker::new((7, 14)));
     picker.guess_protocol();
@@ -822,8 +837,5 @@ fn main() {
         }
     }
 
-    // Well we don't need to join mpv thread: it will be killed after main() is done
-    // handle.join().unwrap();
-    stdout().execute(LeaveAlternateScreen).unwrap();
-    disable_raw_mode().unwrap();
+    restore_tui().unwrap();
 }
