@@ -66,3 +66,5 @@ A very simple script to play songs, does not support TUI, mpris, ...
 ## License
 
 MIT.
+
+This project is not affiliated with or endorsed by the official "osu!" or "ppy" brands.
