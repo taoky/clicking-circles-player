@@ -3,6 +3,10 @@ name = "play"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["chafa"]
+chafa = ["ratatui-image/chafa"]
+
 [dependencies]
 clap = { version = "4.5.7", features = ["derive"] }
 crossterm = "0.27.0"
@@ -10,8 +14,8 @@ image = "0.25.1"
 keepawake = "0.5.1"
 libmpv-sirno = "=2.0.2-fork.1"
 rand = "0.8.5"
-ratatui = "0.26.3"
-ratatui-image = "1.0.1"
+ratatui = "0.27"
+ratatui-image = { git = "https://github.com/taoky/ratatui-image.git", rev = "4514a6debd2213fda43fc98390678e76ea6b4d26" }
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.117"
 souvlaki = { version = "0.7.3", default-features = false, features = ["use_zbus"] }
