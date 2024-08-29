@@ -55,6 +55,18 @@ Based on [ratatui-image](https://github.com/benjajaja/ratatui-image/), it could 
 
 (Tilix)
 
+And currently it would build with [chafa-sys](https://crates.io/crates/chafa-sys) (with a forked [ratatui-image](https://github.com/taoky/ratatui-image/)) by default, to provide a better image rendering when other advanced image protocols are not available:
+
+![chafa by default, in Tilix](assets/chafa.png)
+
+This could be disabled with:
+
+```shell
+cargo build --release --no-default-features
+```
+
+to still fallback to half-block characters.
+
 ![Search](assets/kitty-search-1.png)
 
 Search mode.

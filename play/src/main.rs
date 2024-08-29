@@ -23,7 +23,11 @@ use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
 use serde::Deserialize;
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, PlatformConfig};
 use std::{
-    io::{self, stdout}, panic::{set_hook, take_hook}, path::{Path, PathBuf}, sync::mpsc, time::Duration
+    io::{self, stdout},
+    panic::{set_hook, take_hook},
+    path::{Path, PathBuf},
+    sync::mpsc,
+    time::Duration,
 };
 use tui_input::backend::crossterm::EventHandler;
 use url::Url;
@@ -645,7 +649,6 @@ struct Cli {
     /// Path to osu! files directory
     osu_path: PathBuf,
 }
-
 
 pub fn init_tui() -> io::Result<Terminal<impl ratatui::backend::Backend>> {
     enable_raw_mode()?;
