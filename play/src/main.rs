@@ -315,7 +315,7 @@ impl App {
                     .map(|p| Url::from_file_path(p).unwrap().to_string())
                     .as_deref(),
             })
-            .unwrap();
+            .expect("Cannot set metadata, is there another instance running?");
         set_terminal_title(&self.construct_terminal_title());
     }
 
