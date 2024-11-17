@@ -22,7 +22,7 @@ if (!File.Exists(realmFile))
     return;
 }
 
-const int LazerSchemaVersion = 42;
+const int LazerSchemaVersion = 43;
 RealmConfiguration config = new(realmFile)
 {
     IsReadOnly = true,
