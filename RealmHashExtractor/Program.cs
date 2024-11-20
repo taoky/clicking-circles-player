@@ -50,7 +50,7 @@ if (user_collections.Count > 0)
 }
 Console.Error.WriteLine($"Loaded {collections.Count} collections");
 
-Dictionary<(string, string), BeatmapCleanMetadata> beatmapsByAudioBGFiles = [];
+Dictionary<(string, string?), BeatmapCleanMetadata> beatmapsByAudioBGFiles = [];
 
 foreach (BeatmapCollection collection in collections)
 {
@@ -84,7 +84,8 @@ foreach (BeatmapCollection collection in collections)
             if (audioHash == null || bgHash == null)
             {
                 Console.Error.WriteLine($"      Missing audio or bg hash for {beatmap.Metadata.Artist} - {beatmap.Metadata.Title} [{beatmap.DifficultyName}] {beatmap.MD5Hash}");
-                continue;
+                if (audioHash == null)
+                    continue;
             }
             var metadata = new BeatmapCleanMetadata
             {
@@ -188,6 +189,6 @@ struct BeatmapCleanMetadata
 struct BeatmapFileMetadataInfo
 {
     public string AudioHash { get; set; }
-    public List<string> BGHashes { get; set; }
+    public List<string?> BGHashes { get; set; }
     public BeatmapCleanMetadata Metadata { get; set; }
 }

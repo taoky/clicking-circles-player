@@ -5,7 +5,7 @@ use crossterm::{
         disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetTitle,
     },
 };
-use image::{imageops::crop_imm, GenericImageView};
+use image::{imageops::crop_imm, DynamicImage, GenericImageView};
 use keepawake::KeepAwake;
 use libmpv::{
     events::{Event, PropertyData},
@@ -67,7 +67,7 @@ struct Metadata {
 struct JsonItem {
     audio_hash: String,
     #[serde(rename = "BGHashes")]
-    bg_hashes: Vec<String>,
+    bg_hashes: Vec<Option<String>>,
     metadata: Metadata,
 }
 
@@ -159,6 +159,10 @@ macro_rules! get_current_item {
     };
 }
 
+fn empty_image() -> DynamicImage {
+    image::DynamicImage::new_rgb8(0, 0)
+}
+
 impl App {
     fn new(
         mut picker: ratatui_image::picker::Picker,
@@ -177,7 +181,7 @@ impl App {
             source: String::new(),
             cover_path: None,
             is_unicode: false,
-            bg_img: picker.new_resize_protocol(image::DynamicImage::new_rgb8(1, 1)),
+            bg_img: picker.new_resize_protocol(empty_image()),
             osu_path: osu_path.to_path_buf(),
             json_item,
             controls,
@@ -247,26 +251,34 @@ impl App {
             let bg_hashes = &get_current_item!(self).bg_hashes;
             // randomly choose one
             let bg_hash = bg_hashes.choose(&mut rand::thread_rng()).unwrap();
-            let image = image::io::Reader::open(get_file_path(&self.osu_path, bg_hash))
-                .unwrap()
-                .with_guessed_format()
-                .unwrap()
-                .decode()
-                .unwrap()
-                .to_rgb8();
-            // check if we shall generate a cover...
-            let cache_filename = format!("{}.cover.jpg", bg_hash);
-            let cache_path = self.xdg_dirs.place_cache_file(cache_filename).unwrap();
-            if !cache_path.exists() {
-                let cover = center_largest_square_crop(&image);
-                cover
-                    .to_image()
-                    .save_with_format(cache_path.clone(), image::ImageFormat::Jpeg)
-                    .unwrap();
-            }
-            self.cover_path = Some(cache_path);
+            match bg_hash {
+                Some(bg_hash) => {
+                    let image = image::io::Reader::open(get_file_path(&self.osu_path, bg_hash))
+                        .unwrap()
+                        .with_guessed_format()
+                        .unwrap()
+                        .decode()
+                        .unwrap()
+                        .to_rgb8();
+                    // check if we shall generate a cover...
+                    let cache_filename = format!("{}.cover.jpg", bg_hash);
+                    let cache_path = self.xdg_dirs.place_cache_file(cache_filename).unwrap();
+                    if !cache_path.exists() {
+                        let cover = center_largest_square_crop(&image);
+                        cover
+                            .to_image()
+                            .save_with_format(cache_path.clone(), image::ImageFormat::Jpeg)
+                            .unwrap();
+                    }
+                    self.cover_path = Some(cache_path);
 
-            self.bg_img = picker.new_resize_protocol(image::DynamicImage::ImageRgb8(image));
+                    self.bg_img = picker.new_resize_protocol(image::DynamicImage::ImageRgb8(image));
+                }
+                None => {
+                    self.cover_path = None;
+                    self.bg_img = picker.new_resize_protocol(empty_image())
+                }
+            };
         }
         self.set_metadata();
     }
