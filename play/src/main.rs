@@ -435,7 +435,8 @@ fn main_ui<B>(
         app.ui_dirty = false;
     }
     if event::poll(std::time::Duration::from_millis(16)).unwrap() {
-        if let event::Event::Key(key_event) = event::read().unwrap() {
+        let tm_event = event::read().unwrap();
+        if let event::Event::Key(key_event) = tm_event {
             app.ui_dirty = true;
             match key_event.code {
                 event::KeyCode::Char('q') => {
@@ -475,6 +476,8 @@ fn main_ui<B>(
                 }
                 _ => {}
             }
+        } else if let event::Event::Resize(_, _) = tm_event {
+            app.ui_dirty = true;
         }
     }
 }
@@ -559,7 +562,8 @@ fn search_ui<B>(
         app.ui_dirty = false;
     }
     if event::poll(std::time::Duration::from_millis(16)).unwrap() {
-        if let event::Event::Key(key_event) = event::read().unwrap() {
+        let tm_event = event::read().unwrap();
+        if let event::Event::Key(key_event) = tm_event {
             app.ui_dirty = true;
 
             fn previous(current: usize, offset: usize) -> usize {
@@ -656,6 +660,11 @@ fn search_ui<B>(
                     }
                 },
             }
+        } else if let event::Event::Resize(_, _) = tm_event {
+            app.ui_dirty = true;
+        } else if let event::Event::Paste(_) = tm_event {
+            // search UI accepts user paste
+            app.ui_dirty = true;
         }
     }
 }
