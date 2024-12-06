@@ -151,6 +151,7 @@ struct App {
     search_state: SearchState,
     repeat: bool,
     awake: Option<KeepAwake>,
+    ui_dirty: bool,
 }
 
 macro_rules! get_current_item {
@@ -190,6 +191,7 @@ impl App {
             search_state: SearchState::default(),
             repeat: false,
             awake: build_awake_anyway(),
+            ui_dirty: true,
         }
     }
 
@@ -227,10 +229,6 @@ impl App {
             }
         }
     }
-
-    // fn get_current_item(&self) -> JsonItem {
-    //     self.json_item[self.idx]
-    // }
 
     fn construct_terminal_title(&self) -> String {
         format!(
@@ -395,6 +393,7 @@ fn main_ui<B>(
 ) where
     B: ratatui::backend::Backend,
 {
+    if app.ui_dirty {
     terminal
         .draw(|frame| {
             let outer_block = Block::default()
@@ -433,8 +432,11 @@ fn main_ui<B>(
             frame.render_stateful_widget(imgw, chunks[1], &mut app.bg_img);
         })
         .unwrap();
+        app.ui_dirty = false;
+    }
     if event::poll(std::time::Duration::from_millis(16)).unwrap() {
         if let event::Event::Key(key_event) = event::read().unwrap() {
+            app.ui_dirty = true;
             match key_event.code {
                 event::KeyCode::Char('q') => {
                     mpv_control_tx.send(InternalControl::Quit).unwrap();
@@ -486,6 +488,7 @@ fn search_ui<B>(
     B: ratatui::backend::Backend,
 {
     let mut list_height = 1;
+    if app.ui_dirty {
     terminal
         .draw(|frame| {
             let outer_block = Block::default().title("searching...").borders(Borders::TOP);
@@ -553,8 +556,12 @@ fn search_ui<B>(
             list_height = (chunks[1].height - 2).max(1);
         })
         .unwrap();
+        app.ui_dirty = false;
+    }
     if event::poll(std::time::Duration::from_millis(16)).unwrap() {
         if let event::Event::Key(key_event) = event::read().unwrap() {
+            app.ui_dirty = true;
+
             fn previous(current: usize, offset: usize) -> usize {
                 if offset > current {
                     0
@@ -801,6 +808,7 @@ fn main() {
 
     loop {
         if let Ok(msg) = mpv_event_rx.try_recv() {
+            app.ui_dirty = true;
             match msg {
                 InternalEvent::Pos(time) => {
                     app.update_progress(time);
@@ -827,6 +835,7 @@ fn main() {
         }
 
         for event in souvlaki_rx.try_iter() {
+            app.ui_dirty = true;
             match event {
                 MediaControlEvent::Toggle => {
                     app.set_paused(!app.paused, mpv_control_tx.clone());

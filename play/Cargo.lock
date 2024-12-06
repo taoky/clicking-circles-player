@@ -2065,7 +2065,7 @@ dependencies = [
 [[package]]
 name = "ratatui-image"
 version = "1.0.5"
-source = "git+https://github.com/taoky/ratatui-image.git?rev=22bd0046d7e4ffdebe17e53141f727fefa3ecfc4#22bd0046d7e4ffdebe17e53141f727fefa3ecfc4"
+source = "git+https://github.com/taoky/ratatui-image.git?rev=10914ba54113bb894e62278b9d4bdfbafd2a2b9c#10914ba54113bb894e62278b9d4bdfbafd2a2b9c"
 dependencies = [
  "ansi-to-tui",
  "base64",
