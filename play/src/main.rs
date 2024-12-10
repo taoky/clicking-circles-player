@@ -251,7 +251,7 @@ impl App {
             let bg_hash = bg_hashes.choose(&mut rand::thread_rng()).unwrap();
             match bg_hash {
                 Some(bg_hash) => {
-                    let image = image::io::Reader::open(get_file_path(&self.osu_path, bg_hash))
+                    let image = image::ImageReader::open(get_file_path(&self.osu_path, bg_hash))
                         .unwrap()
                         .with_guessed_format()
                         .unwrap()
