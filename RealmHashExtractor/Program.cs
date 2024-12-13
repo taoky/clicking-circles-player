@@ -133,6 +133,26 @@ foreach (var pair in beatmapsByAudioBGFiles)
     }
 }
 
+// Duplicate checking
+Dictionary<(string, string), int> titleArtistSet = [];
+foreach (var pair in beatmapFileMetadataInfos.Values) {
+    var title = pair.Metadata.Title;
+    var artist = pair.Metadata.Artist;
+    var key = (title, artist);
+
+    if (titleArtistSet.TryGetValue(key, out int currentCount)) {
+        titleArtistSet[key] = currentCount + 1;
+    } else {
+        titleArtistSet[key] = 1;
+    }
+}
+
+foreach (var item in titleArtistSet) {
+    if (item.Value > 1) {
+        Console.Error.WriteLine($"Duplicate found: Title = {item.Key.Item1}, Artist = {item.Key.Item2}, Count = {item.Value}");
+    }
+}
+
 string jsonString = JsonSerializer.Serialize(beatmapFileMetadataInfos.Values);
 if (outputFile == null)
 {
