@@ -77,6 +77,7 @@ struct JsonItem {
     audio_hash: String,
     #[serde(rename = "BGHashes")]
     bg_hashes: Vec<Option<String>>,
+    #[serde(flatten)]
     metadata: Metadata,
 }
 

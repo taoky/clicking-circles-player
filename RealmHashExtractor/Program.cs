@@ -4,6 +4,7 @@ using CommandLine;
 using Realms;
 using System.Text.Json;
 using System.Data;
+using System.Text.Json.Serialization;
 
 string? outputFile = null;
 string? realmFile = null;
@@ -53,7 +54,7 @@ if (user_collections.Count > 0)
 }
 Console.Error.WriteLine($"Loaded {collections.Count} collections");
 
-Dictionary<(string, string?), List<BeatmapCleanMetadata>> beatmapsByAudioBGFiles = [];
+Dictionary<Guid, List<BeatmapCleanMetadata>> beatmapsBySetID = [];
 
 foreach (BeatmapCollection collection in collections)
 {
@@ -101,59 +102,77 @@ foreach (BeatmapCollection collection in collections)
                 Artist = beatmap.Metadata.Artist,
                 ArtistUnicode = beatmap.Metadata.ArtistUnicode,
                 Source = beatmap.Metadata.Source,
+                AudioHash = audioHash,
             };
+            if (bgHash != null)
+            {
+                metadata.BGHashes = [bgHash];
+            }
+            else
+            {
+                metadata.BGHashes = [];
+            }
             if (beatmap.Metadata.Tags != null)
             {
                 metadata.Tags = [.. beatmap.Metadata.Tags.Split(" ")];
             }
-            if (!beatmapsByAudioBGFiles.TryGetValue((audioHash, bgHash), out List<BeatmapCleanMetadata>? v)) {
-                beatmapsByAudioBGFiles[(audioHash, bgHash)] = [metadata];
-            } else {
+            var setID = beatmap.BeatmapSet.ID;
+            if (!beatmapsBySetID.TryGetValue(setID, out List<BeatmapCleanMetadata>? v))
+            {
+                beatmapsBySetID[setID] = [metadata];
+            }
+            else
+            {
                 v.Add(metadata);
             }
         }
     }
 }
 
-// audioHash -> Metadata
-Dictionary<string, BeatmapFileMetadataInfo> beatmapFileMetadataInfos = [];
+List<BeatmapCleanMetadata> beatmapFileMetadataInfos = [];
 
-foreach (var pair in beatmapsByAudioBGFiles)
+foreach (var pair in beatmapsBySetID)
 {
-    var audioHash = pair.Key.Item1;
-    var bgHash = pair.Key.Item2;
     var metadatas = pair.Value;
-    if (!beatmapFileMetadataInfos.TryGetValue(audioHash, out BeatmapFileMetadataInfo value))
+    if (metadatas.Count == 0)
     {
-        beatmapFileMetadataInfos[audioHash] = new BeatmapFileMetadataInfo(audioHash, bgHash, metadatas);
+        throw new ArgumentException("Empty metadata list");
     }
-    else
+    BeatmapCleanMetadata metadata = metadatas[0];
+    for (int i = 1; i < metadatas.Count; i++)
     {
-        value.Update(bgHash, metadatas);
+        metadata.InplaceMerge(metadatas[i]);
     }
+    beatmapFileMetadataInfos.Add(metadata);
 }
 
 // Duplicate checking
 Dictionary<(string, string), int> titleArtistSet = [];
-foreach (var pair in beatmapFileMetadataInfos.Values) {
-    var title = pair.Metadata.Title;
-    var artist = pair.Metadata.Artist;
+foreach (var pair in beatmapFileMetadataInfos)
+{
+    var title = pair.Title;
+    var artist = pair.Artist;
     var key = (title, artist);
 
-    if (titleArtistSet.TryGetValue(key, out int currentCount)) {
+    if (titleArtistSet.TryGetValue(key, out int currentCount))
+    {
         titleArtistSet[key] = currentCount + 1;
-    } else {
+    }
+    else
+    {
         titleArtistSet[key] = 1;
     }
 }
 
-foreach (var item in titleArtistSet) {
-    if (item.Value > 1) {
+foreach (var item in titleArtistSet)
+{
+    if (item.Value > 1)
+    {
         Console.Error.WriteLine($"Duplicate found: Title = {item.Key.Item1}, Artist = {item.Key.Item2}, Count = {item.Value}");
     }
 }
 
-string jsonString = JsonSerializer.Serialize(beatmapFileMetadataInfos.Values);
+string jsonString = JsonSerializer.Serialize(beatmapFileMetadataInfos);
 if (outputFile == null)
 {
     Console.WriteLine(jsonString);
@@ -184,6 +203,10 @@ struct BeatmapCleanMetadata
     public string ArtistUnicode { get; set; }
     public string Source { get; set; }
     public HashSet<string> Tags { get; set; }
+
+    public string AudioHash { get; set; }
+
+    public HashSet<string> BGHashes { get; set; }
 
     public override readonly int GetHashCode()
     {
@@ -239,50 +262,11 @@ struct BeatmapCleanMetadata
             Console.Error.WriteLine($"Different source when merging: {Source} <- {others.Source}");
         }
         Tags.UnionWith(others.Tags);
-    }
-}
 
-struct BeatmapFileMetadataInfo
-{
-    public string AudioHash { get; set; }
-    public HashSet<string?> BGHashes { get; set; }
-    public BeatmapCleanMetadata Metadata { get; set; }
-
-    public BeatmapFileMetadataInfo(string audioHash, string? bgHash, List<BeatmapCleanMetadata> metadatas)
-    {
-        AudioHash = audioHash;
-        if (bgHash != null) {
-            BGHashes = [bgHash];
-        } else {
-            BGHashes = [];
-        }
-        if (metadatas.Count == 0)
+        if (AudioHash != others.AudioHash)
         {
-            throw new ArgumentException("Empty metadata list");
+            Console.Error.WriteLine($"AudioHash does not match when merging, for song {Title}");
         }
-        BeatmapCleanMetadata metadata = metadatas[0];
-        for (int i = 1; i < metadatas.Count; i++)
-        {
-            metadata.InplaceMerge(metadatas[i]);
-        }
-        Metadata = metadata;
-    }
-
-    public readonly void Update(string? bgHash, List<BeatmapCleanMetadata> metadatas)
-    {
-        if (bgHash != null)
-        {
-            BGHashes.Add(bgHash);
-        }
-        if (metadatas.Count == 0)
-        {
-            throw new ArgumentException("Empty metadata list");
-        }
-        BeatmapCleanMetadata metadata = metadatas[0];
-        for (int i = 1; i < metadatas.Count; i++)
-        {
-            metadata.InplaceMerge(metadatas[i]);
-        }
-        Metadata.InplaceMerge(metadata);
+        BGHashes.UnionWith(others.BGHashes);
     }
 }
