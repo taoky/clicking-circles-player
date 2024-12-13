@@ -1,6 +1,6 @@
 ﻿using Realms;
 
-namespace CollectionDowngrader.LazerSchema
+namespace RealmHashExtractor.LazerSchema
 {
     public class BeatmapUserSettings : EmbeddedObject
     {

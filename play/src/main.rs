@@ -20,7 +20,7 @@ use ratatui::{
     Terminal,
 };
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, PlatformConfig};
 use std::{
     io::{self, stdout},
@@ -58,8 +58,17 @@ struct Metadata {
     artist: String,
     artist_unicode: String,
     source: String,
-    #[allow(dead_code)]
+    #[serde(deserialize_with = "vec_to_space_joined")]
     tags: String,
+}
+
+fn vec_to_space_joined<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let vec: Vec<String> = Vec::deserialize(deserializer)?;
+
+    Ok(vec.join(" "))
 }
 
 #[derive(Deserialize)]
@@ -100,6 +109,7 @@ struct SearchState {
     input_mode: InputMode,
     results: Vec<usize>,
     list_state: ListState,
+    list_height: u16,
 }
 
 impl Default for SearchState {
@@ -109,6 +119,7 @@ impl Default for SearchState {
             input_mode: InputMode::Editing,
             results: Vec::new(),
             list_state: ListState::default(),
+            list_height: 1,
         }
     }
 }
@@ -372,6 +383,7 @@ impl App {
                 || item.metadata.source.to_lowercase().contains(&query)
                 || item.metadata.title_unicode.to_lowercase().contains(&query)
                 || item.metadata.artist_unicode.to_lowercase().contains(&query)
+                || item.metadata.tags.to_lowercase().contains(&query)
             {
                 result.push(i);
             }
@@ -394,44 +406,44 @@ fn main_ui<B>(
     B: ratatui::backend::Backend,
 {
     if app.ui_dirty {
-    terminal
-        .draw(|frame| {
-            let outer_block = Block::default()
-                .title("osu! player tools")
-                .title(
-                    Title::from(format!("{}/{}", app.idx + 1, app.json_item.len()))
-                        .alignment(ratatui::layout::Alignment::Right),
-                )
-                .borders(Borders::TOP);
-            let chunks = Layout::default()
-                .direction(ratatui::layout::Direction::Vertical)
-                .margin(1)
-                .constraints(
-                    [
-                        ratatui::layout::Constraint::Percentage(10),
-                        ratatui::layout::Constraint::Percentage(90),
-                    ]
-                    .as_ref(),
-                )
-                .split(outer_block.inner(frame.size()));
-            frame.render_widget(outer_block, frame.size());
-            frame.render_widget(
-                Paragraph::new(format!(
-                    "{} - {} {:.1} / {:.1} ({}{})",
-                    app.title,
-                    app.artist,
-                    app.progress,
-                    app.total,
-                    if app.paused { "paused" } else { "playing" },
-                    if app.repeat { " repeat" } else { "" }
-                ))
-                .wrap(Wrap { trim: true }),
-                chunks[0],
-            );
-            let imgw = StatefulImage::new(None);
-            frame.render_stateful_widget(imgw, chunks[1], &mut app.bg_img);
-        })
-        .unwrap();
+        terminal
+            .draw(|frame| {
+                let outer_block = Block::default()
+                    .title("osu! player tools")
+                    .title(
+                        Title::from(format!("{}/{}", app.idx + 1, app.json_item.len()))
+                            .alignment(ratatui::layout::Alignment::Right),
+                    )
+                    .borders(Borders::TOP);
+                let chunks = Layout::default()
+                    .direction(ratatui::layout::Direction::Vertical)
+                    .margin(1)
+                    .constraints(
+                        [
+                            ratatui::layout::Constraint::Percentage(10),
+                            ratatui::layout::Constraint::Percentage(90),
+                        ]
+                        .as_ref(),
+                    )
+                    .split(outer_block.inner(frame.size()));
+                frame.render_widget(outer_block, frame.size());
+                frame.render_widget(
+                    Paragraph::new(format!(
+                        "{} - {} {:.1} / {:.1} ({}{})",
+                        app.title,
+                        app.artist,
+                        app.progress,
+                        app.total,
+                        if app.paused { "paused" } else { "playing" },
+                        if app.repeat { " repeat" } else { "" }
+                    ))
+                    .wrap(Wrap { trim: true }),
+                    chunks[0],
+                );
+                let imgw = StatefulImage::new(None);
+                frame.render_stateful_widget(imgw, chunks[1], &mut app.bg_img);
+            })
+            .unwrap();
         app.ui_dirty = false;
     }
     if event::poll(std::time::Duration::from_millis(16)).unwrap() {
@@ -490,75 +502,76 @@ fn search_ui<B>(
 ) where
     B: ratatui::backend::Backend,
 {
-    let mut list_height = 1;
     if app.ui_dirty {
-    terminal
-        .draw(|frame| {
-            let outer_block = Block::default().title("searching...").borders(Borders::TOP);
-            let chunks = Layout::default()
-                .direction(ratatui::layout::Direction::Vertical)
-                .margin(1)
-                .constraints(
-                    [
-                        ratatui::layout::Constraint::Length(3),
-                        ratatui::layout::Constraint::Min(3),
-                    ]
-                    .as_ref(),
-                )
-                .split(outer_block.inner(frame.size()));
-            frame.render_widget(outer_block, frame.size());
-            let width = chunks[0].width.max(3) - 3;
-            let scroll = app.search_state.input.visual_scroll(width as usize);
-            let input = Paragraph::new(app.search_state.input.value())
-                .style(match app.search_state.input_mode {
-                    InputMode::Normal => Style::default(),
-                    InputMode::Editing => Style::default().fg(ratatui::style::Color::Yellow),
-                })
-                .scroll((0, scroll as u16))
-                .block(Block::default().borders(Borders::ALL).title("Search"));
-            frame.render_widget(input, chunks[0]);
-            if app.search_state.input_mode == InputMode::Editing {
-                frame.set_cursor(
-                    chunks[0].x
-                        + 1
-                        + (app.search_state.input.visual_cursor().max(scroll) - scroll) as u16,
-                    chunks[0].y + 1,
-                );
-            }
-            let items: Vec<ListItem> = app
-                .search_state
-                .results
-                .iter()
-                .map(|&i| ListItem::new(app.item_to_string(i)))
-                .collect();
-            let items_title = if let Some(idx) = app.search_state.list_state.selected() {
-                format!("Results ({}/{})", idx + 1, items.len())
-            } else {
-                "Results".to_string()
-            };
-            let items = List::new(items)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title(items_title)
-                        .border_style(match app.search_state.input_mode {
-                            InputMode::Normal => Style::default().fg(ratatui::style::Color::Yellow),
-                            InputMode::Editing => Style::default(),
-                        }),
-                )
-                .highlight_style(
-                    Style::default()
-                        .add_modifier(Modifier::BOLD)
-                        .add_modifier(Modifier::BOLD)
-                        .fg(ratatui::style::Color::Yellow),
-                )
-                .highlight_symbol(">")
-                .highlight_spacing(ratatui::widgets::HighlightSpacing::Always);
-            // frame.render_widget(items, chunks[1]);
-            frame.render_stateful_widget(items, chunks[1], &mut app.search_state.list_state);
-            list_height = (chunks[1].height - 2).max(1);
-        })
-        .unwrap();
+        terminal
+            .draw(|frame| {
+                let outer_block = Block::default().title("searching...").borders(Borders::TOP);
+                let chunks = Layout::default()
+                    .direction(ratatui::layout::Direction::Vertical)
+                    .margin(1)
+                    .constraints(
+                        [
+                            ratatui::layout::Constraint::Length(3),
+                            ratatui::layout::Constraint::Min(3),
+                        ]
+                        .as_ref(),
+                    )
+                    .split(outer_block.inner(frame.size()));
+                frame.render_widget(outer_block, frame.size());
+                let width = chunks[0].width.max(3) - 3;
+                let scroll = app.search_state.input.visual_scroll(width as usize);
+                let input = Paragraph::new(app.search_state.input.value())
+                    .style(match app.search_state.input_mode {
+                        InputMode::Normal => Style::default(),
+                        InputMode::Editing => Style::default().fg(ratatui::style::Color::Yellow),
+                    })
+                    .scroll((0, scroll as u16))
+                    .block(Block::default().borders(Borders::ALL).title("Search"));
+                frame.render_widget(input, chunks[0]);
+                if app.search_state.input_mode == InputMode::Editing {
+                    frame.set_cursor(
+                        chunks[0].x
+                            + 1
+                            + (app.search_state.input.visual_cursor().max(scroll) - scroll) as u16,
+                        chunks[0].y + 1,
+                    );
+                }
+                let items: Vec<ListItem> = app
+                    .search_state
+                    .results
+                    .iter()
+                    .map(|&i| ListItem::new(app.item_to_string(i)))
+                    .collect();
+                let items_title = if let Some(idx) = app.search_state.list_state.selected() {
+                    format!("Results ({}/{})", idx + 1, items.len())
+                } else {
+                    "Results".to_string()
+                };
+                let items = List::new(items)
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title(items_title)
+                            .border_style(match app.search_state.input_mode {
+                                InputMode::Normal => {
+                                    Style::default().fg(ratatui::style::Color::Yellow)
+                                }
+                                InputMode::Editing => Style::default(),
+                            }),
+                    )
+                    .highlight_style(
+                        Style::default()
+                            .add_modifier(Modifier::BOLD)
+                            .add_modifier(Modifier::BOLD)
+                            .fg(ratatui::style::Color::Yellow),
+                    )
+                    .highlight_symbol(">")
+                    .highlight_spacing(ratatui::widgets::HighlightSpacing::Always);
+                // frame.render_widget(items, chunks[1]);
+                frame.render_stateful_widget(items, chunks[1], &mut app.search_state.list_state);
+                app.search_state.list_height = (chunks[1].height - 2).max(1);
+            })
+            .unwrap();
         app.ui_dirty = false;
     }
     if event::poll(std::time::Duration::from_millis(16)).unwrap() {
@@ -567,19 +580,11 @@ fn search_ui<B>(
             app.ui_dirty = true;
 
             fn previous(current: usize, offset: usize) -> usize {
-                if offset > current {
-                    0
-                } else {
-                    current - offset
-                }
+                current.saturating_sub(offset)
             }
 
             fn next(current: usize, total: usize, offset: usize) -> usize {
-                if current + offset >= total {
-                    total - 1
-                } else {
-                    current + offset
-                }
+                current.saturating_add(offset).min(total - 1)
             }
 
             fn circular_previous(current: usize, total: usize, offset: usize) -> usize {
@@ -611,7 +616,7 @@ fn search_ui<B>(
                     event::KeyCode::PageUp => {
                         let i = previous(
                             app.search_state.list_state.selected().unwrap_or(0),
-                            list_height.into(),
+                            app.search_state.list_height.into(),
                         );
                         app.search_state.list_state.select(Some(i));
                     }
@@ -619,7 +624,7 @@ fn search_ui<B>(
                         let i = next(
                             app.search_state.list_state.selected().unwrap_or(0),
                             app.search_state.results.len(),
-                            list_height.into(),
+                            app.search_state.list_height.into(),
                         );
                         app.search_state.list_state.select(Some(i));
                     }

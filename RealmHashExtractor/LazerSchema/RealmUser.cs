@@ -1,7 +1,7 @@
 ﻿// Original source file (modified by kabii) Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 using Realms;
 
-namespace CollectionDowngrader.LazerSchema
+namespace RealmHashExtractor.LazerSchema
 {
     public class RealmUser : EmbeddedObject
     {

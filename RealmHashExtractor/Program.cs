@@ -1,15 +1,18 @@
 ﻿// CollectionDowngrader.LazerSchema from https://github.com/ookiineko/CollectionDowngrader/tree/main/LazerSchema
-using CollectionDowngrader.LazerSchema;
+using RealmHashExtractor.LazerSchema;
 using CommandLine;
 using Realms;
 using System.Text.Json;
+using System.Data;
 
+string? outputFile = null;
 string? realmFile = null;
 List<string> user_collections = [];
 Parser.Default.ParseArguments<CliOptions>(args)
     .WithParsed<CliOptions>(o =>
     {
         realmFile = o.RealmFile;
+        outputFile = o.Output;
         if (o.Collections != null)
         {
             user_collections = o.Collections.ToList();
@@ -50,7 +53,7 @@ if (user_collections.Count > 0)
 }
 Console.Error.WriteLine($"Loaded {collections.Count} collections");
 
-Dictionary<(string, string?), BeatmapCleanMetadata> beatmapsByAudioBGFiles = [];
+Dictionary<(string, string?), List<BeatmapCleanMetadata>> beatmapsByAudioBGFiles = [];
 
 foreach (BeatmapCollection collection in collections)
 {
@@ -65,6 +68,7 @@ foreach (BeatmapCollection collection in collections)
             {
                 continue;
             }
+            // The file is case-insensitive.
             var audioName = beatmap.Metadata.AudioFile;
             string? audioHash = null;
             var bgName = beatmap.Metadata.BackgroundFile;
@@ -72,11 +76,11 @@ foreach (BeatmapCollection collection in collections)
             var files = beatmap.BeatmapSet.Files;
             foreach (RealmNamedFileUsage file in files)
             {
-                if (file.Filename == audioName)
+                if (string.Equals(file.Filename, audioName, StringComparison.OrdinalIgnoreCase))
                 {
                     audioHash = file.File.Hash;
                 }
-                if (file.Filename == bgName)
+                if (string.Equals(file.Filename, bgName, StringComparison.OrdinalIgnoreCase))
                 {
                     bgHash = file.File.Hash;
                 }
@@ -84,8 +88,11 @@ foreach (BeatmapCollection collection in collections)
             if (audioHash == null || bgHash == null)
             {
                 Console.Error.WriteLine($"      Missing audio or bg hash for {beatmap.Metadata.Artist} - {beatmap.Metadata.Title} [{beatmap.DifficultyName}] {beatmap.MD5Hash}");
+                // Console.Error.WriteLine($"       audioName: {audioName}, bgName: {bgName}");
+                // Console.Error.WriteLine($"       Files: {string.Join(", ", files)}");
                 if (audioHash == null)
                     continue;
+                Console.Error.WriteLine("       (Continue as audio exists)");
             }
             var metadata = new BeatmapCleanMetadata
             {
@@ -94,16 +101,16 @@ foreach (BeatmapCollection collection in collections)
                 Artist = beatmap.Metadata.Artist,
                 ArtistUnicode = beatmap.Metadata.ArtistUnicode,
                 Source = beatmap.Metadata.Source,
-                Tags = beatmap.Metadata.Tags
             };
-            if (beatmapsByAudioBGFiles.ContainsKey((audioHash, bgHash)) && !beatmapsByAudioBGFiles[(audioHash, bgHash)].Equals(metadata))
+            if (beatmap.Metadata.Tags != null)
             {
-                Console.Error.WriteLine($"      Duplicate audio and bg hash for {beatmap.Metadata.Artist} - {beatmap.Metadata.Title} [{beatmap.DifficultyName}] {beatmap.MD5Hash}");
-                Console.Error.WriteLine($"        Old: {beatmapsByAudioBGFiles[(audioHash, bgHash)]}");
-                Console.Error.WriteLine($"        New: {metadata}");
-                Console.Error.WriteLine("        Overwriting anyway.");
+                metadata.Tags = [.. beatmap.Metadata.Tags.Split(" ")];
             }
-            beatmapsByAudioBGFiles[(audioHash, bgHash)] = metadata;
+            if (!beatmapsByAudioBGFiles.TryGetValue((audioHash, bgHash), out List<BeatmapCleanMetadata>? v)) {
+                beatmapsByAudioBGFiles[(audioHash, bgHash)] = [metadata];
+            } else {
+                v.Add(metadata);
+            }
         }
     }
 }
@@ -115,30 +122,26 @@ foreach (var pair in beatmapsByAudioBGFiles)
 {
     var audioHash = pair.Key.Item1;
     var bgHash = pair.Key.Item2;
-    var metadata = pair.Value;
+    var metadatas = pair.Value;
     if (!beatmapFileMetadataInfos.TryGetValue(audioHash, out BeatmapFileMetadataInfo value))
     {
-        beatmapFileMetadataInfos[audioHash] = new BeatmapFileMetadataInfo
-        {
-            AudioHash = audioHash,
-            BGHashes = [bgHash],
-            Metadata = metadata
-        };
+        beatmapFileMetadataInfos[audioHash] = new BeatmapFileMetadataInfo(audioHash, bgHash, metadatas);
     }
     else
     {
-        value.BGHashes.Add(bgHash);
-        if (!value.Metadata.Equals(metadata))
-        {
-            Console.Error.WriteLine($"      Different metadata for {metadata.Artist} - {metadata.Title}");
-            Console.Error.WriteLine($"        Old: {value.Metadata}");
-            Console.Error.WriteLine($"        New: {metadata}");
-        }
+        value.Update(bgHash, metadatas);
     }
 }
 
 string jsonString = JsonSerializer.Serialize(beatmapFileMetadataInfos.Values);
-Console.WriteLine(jsonString);
+if (outputFile == null)
+{
+    Console.WriteLine(jsonString);
+}
+else
+{
+    File.WriteAllText(outputFile, jsonString);
+}
 
 
 class CliOptions
@@ -148,6 +151,9 @@ class CliOptions
 
     [Value(0, MetaName = "RealmFile", Required = true, HelpText = "Path to realm file")]
     public required string RealmFile { get; set; }
+
+    [Option('o', "output", Required = false, HelpText = "File to output JSON. Stdout if not provided.")]
+    public string? Output { get; set; }
 }
 
 struct BeatmapCleanMetadata
@@ -157,22 +163,7 @@ struct BeatmapCleanMetadata
     public string Artist { get; set; }
     public string ArtistUnicode { get; set; }
     public string Source { get; set; }
-    public string? Tags { get; set; }
-
-    public override readonly bool Equals(object? obj)
-    {
-        if (obj is not BeatmapCleanMetadata other)
-        {
-            return false;
-        }
-
-        // Don't compare tags
-        return Title == other.Title &&
-            TitleUnicode == other.TitleUnicode &&
-            Artist == other.Artist &&
-            ArtistUnicode == other.ArtistUnicode &&
-            Source == other.Source;
-    }
+    public HashSet<string> Tags { get; set; }
 
     public override readonly int GetHashCode()
     {
@@ -184,11 +175,94 @@ struct BeatmapCleanMetadata
     {
         return $"Title: {Title}, TitleUnicode: {TitleUnicode}, Artist: {Artist}, ArtistUnicode: {ArtistUnicode}, Source: {Source}, Tags: {Tags}";
     }
+
+    public void InplaceMerge(BeatmapCleanMetadata others)
+    {
+        if (Title.Length == 0)
+        {
+            Title = others.Title;
+        }
+        else if (Title != others.Title)
+        {
+            Console.Error.WriteLine($"Different title when merging: {Title} <- {others.Title}");
+        }
+        if (TitleUnicode.Length == 0)
+        {
+            TitleUnicode = others.TitleUnicode;
+        }
+        else if (TitleUnicode != others.TitleUnicode)
+        {
+            Console.Error.WriteLine($"Different title (unicode) when merging: {TitleUnicode} <- {others.TitleUnicode}");
+        }
+        if (Artist.Length == 0)
+        {
+            Artist = others.Artist;
+        }
+        else if (Artist != others.Artist)
+        {
+            Console.Error.WriteLine($"Different artist when merging: {Artist} <- {others.Artist}");
+        }
+        if (ArtistUnicode.Length == 0)
+        {
+            ArtistUnicode = others.ArtistUnicode;
+        }
+        else if (ArtistUnicode != others.ArtistUnicode)
+        {
+            Console.Error.WriteLine($"Different artist (unicode) when merging: {ArtistUnicode} <- {others.ArtistUnicode}");
+        }
+        if (Source.Length == 0)
+        {
+            Source = others.Source;
+        }
+        else if (Source != others.Source)
+        {
+            Console.Error.WriteLine($"Different source when merging: {Source} <- {others.Source}");
+        }
+        Tags.UnionWith(others.Tags);
+    }
 }
 
 struct BeatmapFileMetadataInfo
 {
     public string AudioHash { get; set; }
-    public List<string?> BGHashes { get; set; }
+    public HashSet<string?> BGHashes { get; set; }
     public BeatmapCleanMetadata Metadata { get; set; }
+
+    public BeatmapFileMetadataInfo(string audioHash, string? bgHash, List<BeatmapCleanMetadata> metadatas)
+    {
+        AudioHash = audioHash;
+        if (bgHash != null) {
+            BGHashes = [bgHash];
+        } else {
+            BGHashes = [];
+        }
+        if (metadatas.Count == 0)
+        {
+            throw new ArgumentException("Empty metadata list");
+        }
+        BeatmapCleanMetadata metadata = metadatas[0];
+        for (int i = 1; i < metadatas.Count; i++)
+        {
+            metadata.InplaceMerge(metadatas[i]);
+        }
+        Metadata = metadata;
+    }
+
+    public readonly void Update(string? bgHash, List<BeatmapCleanMetadata> metadatas)
+    {
+        if (bgHash != null)
+        {
+            BGHashes.Add(bgHash);
+        }
+        if (metadatas.Count == 0)
+        {
+            throw new ArgumentException("Empty metadata list");
+        }
+        BeatmapCleanMetadata metadata = metadatas[0];
+        for (int i = 1; i < metadatas.Count; i++)
+        {
+            metadata.InplaceMerge(metadatas[i]);
+        }
+        Metadata.InplaceMerge(metadata);
+    }
 }

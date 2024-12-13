@@ -2,7 +2,7 @@
 using Realms;
 using System.Text;
 
-namespace CollectionDowngrader.LazerSchema
+namespace RealmHashExtractor.LazerSchema
 {
     public class BeatmapSet : RealmObject
     {
