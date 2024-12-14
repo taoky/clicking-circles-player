@@ -76,7 +76,7 @@ where
 struct JsonItem {
     audio_hash: String,
     #[serde(rename = "BGHashes")]
-    bg_hashes: Vec<Option<String>>,
+    bg_hashes: Vec<String>,
     #[serde(flatten)]
     metadata: Metadata,
 }
@@ -260,7 +260,7 @@ impl App {
         if let Some(picker) = picker.as_mut() {
             let bg_hashes = &get_current_item!(self).bg_hashes;
             // randomly choose one
-            let bg_hash = bg_hashes.choose(&mut rand::thread_rng()).unwrap();
+            let bg_hash = bg_hashes.choose(&mut rand::thread_rng());
             match bg_hash {
                 Some(bg_hash) => {
                     let image = image::ImageReader::open(get_file_path(&self.osu_path, bg_hash))
