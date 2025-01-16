@@ -682,6 +682,11 @@ struct Cli {
 
     /// Path to osu! files directory
     osu_path: PathBuf,
+
+    /// Controls loudness normalization
+    #[clap(long = "loudnorm", default_value_t = true, action = clap::ArgAction::SetTrue)]
+    #[clap(long = "no-loudnorm", action = clap::ArgAction::SetFalse)]
+    loudnorm: bool,
 }
 
 pub fn init_tui() -> io::Result<Terminal<impl ratatui::backend::Backend>> {
@@ -722,6 +727,9 @@ fn main() {
     let mpv = Mpv::with_initializer(|c| c.set_property("load-scripts", "no")).unwrap();
     mpv.set_property("vo", "null").unwrap();
     mpv.set_property("volume", 100).unwrap();
+    if args.loudnorm {
+        mpv.set_property("af", "lavfi=[loudnorm=I=-14:TP=-2:LRA=11]").unwrap();
+    }
 
     let souvlaki_config = PlatformConfig {
         dbus_name: APP_ID,
