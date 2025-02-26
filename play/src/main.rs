@@ -2,24 +2,25 @@ use clap::Parser;
 use crossterm::{
     event::{self},
     terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetTitle,
+        EnterAlternateScreen, LeaveAlternateScreen, SetTitle, disable_raw_mode, enable_raw_mode,
     },
 };
-use image::{imageops::crop_imm, DynamicImage, GenericImageView};
+use image::{DynamicImage, GenericImageView, imageops::crop_imm};
 use keepawake::KeepAwake;
 use libmpv::{
+    Mpv,
     events::{Event, PropertyData},
-    mpv_end_file_reason, Mpv,
+    mpv_end_file_reason,
 };
 use rand::prelude::SliceRandom;
 use ratatui::{
+    Terminal,
     backend::CrosstermBackend,
     layout::Layout,
     style::{Modifier, Style},
-    widgets::{block::Title, Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
-    Terminal,
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap, block::Title},
 };
-use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
+use ratatui_image::{StatefulImage, picker::Picker, protocol::StatefulProtocol};
 use serde::{Deserialize, Deserializer};
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, PlatformConfig};
 use std::{
@@ -728,7 +729,8 @@ fn main() {
     mpv.set_property("vo", "null").unwrap();
     mpv.set_property("volume", 100).unwrap();
     if args.loudnorm {
-        mpv.set_property("af", "lavfi=[loudnorm=I=-14:TP=-2:LRA=11]").unwrap();
+        mpv.set_property("af", "lavfi=[loudnorm=I=-14:TP=-2:LRA=11]")
+            .unwrap();
     }
 
     let souvlaki_config = PlatformConfig {
