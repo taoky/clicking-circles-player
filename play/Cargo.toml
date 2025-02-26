@@ -1,7 +1,7 @@
 [package]
 name = "play"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [features]
 default = ["chafa"]
@@ -18,7 +18,7 @@ ratatui = "0.27"
 ratatui-image = { git = "https://github.com/taoky/ratatui-image.git", rev = "10914ba54113bb894e62278b9d4bdfbafd2a2b9c" }
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.117"
-souvlaki = { git = "https://github.com/taoky/souvlaki.git", rev = "69ba3372c04ae9e83b713d3dc8cc6492c7bcc0c1", default-features = false, features = ["use_zbus"] }
+souvlaki = { version = "0.8.0", default-features = false, features = ["use_zbus"] }
 tui-input = "0.8.0"
 url = "2.5.2"
 xdg = "2.5.2"
