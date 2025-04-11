@@ -20,7 +20,7 @@ Assuming that you're using <https://github.com/flathub/sh.ppy.osu>, which data f
 
 ```sh
 cd RealmHashExtractor
-dotnet run -- ~/.var/app/sh.ppy.osu/data/osu/client.realm > ../song.json
+dotnet run -- ~/.var/app/sh.ppy.osu/data/osu/client.realm --collection Songs -o ../song.json
 ```
 
 ### Player
