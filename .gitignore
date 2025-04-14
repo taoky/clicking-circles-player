@@ -2,3 +2,5 @@ bin/
 obj/
 client.realm
 song*.json
+filelist
+song*.tar.*
