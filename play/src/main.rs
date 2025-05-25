@@ -35,6 +35,7 @@ use url::Url;
 
 const APP_ID: &str = "moe.taoky.clicking-circles-player";
 const APP_NAME: &str = "clicking-circles-player";
+const APP_DISPLAY_NAME: &str = "Clicking Circles Player";
 
 enum InternalEvent {
     Pos(f64),
@@ -132,7 +133,7 @@ fn build_awake() -> Result<KeepAwake, keepawake::Error> {
         .idle(false)
         .sleep(true)
         .app_reverse_domain(APP_ID)
-        .app_name(APP_NAME)
+        .app_name(APP_DISPLAY_NAME)
         .reason("Playing music")
         .create()
 }
@@ -246,7 +247,7 @@ impl App {
     fn construct_terminal_title(&self) -> String {
         format!(
             "{} - {} {}",
-            APP_NAME,
+            APP_DISPLAY_NAME,
             if self.paused { "Paused" } else { "Playing" },
             self.get_title(&get_current_item!(self))
         )
@@ -411,7 +412,7 @@ fn main_ui<B>(
         terminal
             .draw(|frame| {
                 let outer_block = Block::default()
-                    .title("clicking circles player")
+                    .title(APP_DISPLAY_NAME)
                     .title(
                         Title::from(format!("{}/{}", app.idx + 1, app.json_item.len()))
                             .alignment(ratatui::layout::Alignment::Right),
@@ -507,7 +508,7 @@ fn search_ui<B>(
     if app.ui_dirty {
         terminal
             .draw(|frame| {
-                let outer_block = Block::default().title("searching...").borders(Borders::TOP);
+                let outer_block = Block::default().title("Searching...").borders(Borders::TOP);
                 let chunks = Layout::default()
                     .direction(ratatui::layout::Direction::Vertical)
                     .margin(1)
@@ -735,7 +736,7 @@ fn main() {
 
     let souvlaki_config = PlatformConfig {
         dbus_name: APP_ID,
-        display_name: APP_NAME,
+        display_name: APP_DISPLAY_NAME,
         hwnd: None,
     };
     let mut controls = MediaControls::new(souvlaki_config).unwrap();
