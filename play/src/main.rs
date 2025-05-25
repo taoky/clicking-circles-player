@@ -33,8 +33,8 @@ use std::{
 use tui_input::backend::crossterm::EventHandler;
 use url::Url;
 
-const APP_ID: &str = "moe.taoky.osu-player-tools";
-const APP_NAME: &str = "osu-player-tools";
+const APP_ID: &str = "moe.taoky.clicking-circles-player";
+const APP_NAME: &str = "clicking-circles-player";
 
 enum InternalEvent {
     Pos(f64),
@@ -411,7 +411,7 @@ fn main_ui<B>(
         terminal
             .draw(|frame| {
                 let outer_block = Block::default()
-                    .title("osu! player tools")
+                    .title("clicking circles player")
                     .title(
                         Title::from(format!("{}/{}", app.idx + 1, app.json_item.len()))
                             .alignment(ratatui::layout::Alignment::Right),

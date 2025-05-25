@@ -1,6 +1,6 @@
-# osu-player-tools
+# clicking-circles-player
 
-Some very simple and dirty tools for playing osu! songs in terminal.
+An interactive terminal player for playing osu! songs.
 
 `RealmHashExtractor` uses code from <https://github.com/ookiineko/CollectionDowngrader> (and thus <https://github.com/ppy/osu/>).
 
