@@ -3,6 +3,7 @@
 # Usage:
 # ./genfilelist.py ./song.json > filelist
 # tar cvaf song.tar.zst -C ~/.var/app/sh.ppy.osu/data/osu/files/ --files-from=filelist
+# rsync -avP --files-from=filelist ~/.var/app/sh.ppy.osu/data/osu/files/ user@host:/path/to/destination
 
 import argparse
 from pathlib import Path
