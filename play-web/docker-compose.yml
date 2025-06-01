@@ -2,18 +2,14 @@ version: '3'
 
 services:
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: ghcr.io/taoky/clicking-circles-player-frontend:master
     environment:
       - NEXT_PUBLIC_API_URL=/api
     restart: unless-stopped
     hostname: frontend
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ghcr.io/taoky/clicking-circles-player-backend:master
     volumes:
       - $HOME/.var/app/sh.ppy.osu/data/osu/files/:/data/files:ro
       - $HOME/Projects/clicking-circles-player/song.json:/data/song.json:ro
