@@ -4,6 +4,8 @@ An interactive terminal player for playing osu! songs.
 
 `RealmHashExtractor` uses code from <https://github.com/ookiineko/CollectionDowngrader> (and thus <https://github.com/ppy/osu/>).
 
+A web version created by LLM is at [play-web](./play-web/). This is just an experiment and it might be refactored later.
+
 ## TODOs
 
 - [x] Add a proper README.
