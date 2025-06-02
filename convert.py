@@ -42,28 +42,37 @@ def main(args):
 
         # run ffmpeg
         # convert everything to mp3, as ogg does not support cover images
-        if audio_type == ".ogg":
+        target_path = args.output / f"{title} - {artist}.mp3"
+        if audio_type == ".ogg" or not args.no_loudnorm:
             audio_codec = "libmp3lame"
         else:
             audio_codec = "copy"
+        if args.no_loudnorm:
+            loudnorm_args = []
+        else:
+            loudnorm_args = ["-af", "loudnorm=I=-14:TP=-2:LRA=11"]
+        if args.no_overwrite and target_path.exists():
+            continue
         if bg_path:
             subprocess.run([
                 "ffmpeg", "-y", "-i", str(audio_path), "-i", str(bg_path),
+                *loudnorm_args,
                 "-map", "0:a", "-map", "1:v", "-c:a", audio_codec,
                 "-c:v", "copy", "-id3v2_version", "3",
                 "-metadata", f"title={title}",
                 "-metadata", f"artist={artist}",
                 "-metadata", f"album={album}",
-                str(args.output / f"{title} - {artist}.mp3"),
+                str(target_path),
             ], check=True, stdout=subprocess.DEVNULL)
         else:
             subprocess.run([
                 "ffmpeg", "-y", "-i", str(audio_path),
+                *loudnorm_args,
                 "-c:a", audio_codec, "-id3v2_version", "3",
                 "-metadata", f"title={title}",
                 "-metadata", f"artist={artist}",
                 "-metadata", f"album={album}",
-                str(args.output / f"{title} - {artist}.mp3"),
+                str(target_path),
             ], check=True, stdout=subprocess.DEVNULL)
 
 if __name__ == "__main__":
@@ -71,6 +80,8 @@ if __name__ == "__main__":
     parser.add_argument("--json", type=Path, help="Path to json file")
     parser.add_argument("--data", type=Path, help="Path to osu! data directory")
     parser.add_argument("--output", type=Path, help="Output directory for music files")
+    parser.add_argument("--no-loudnorm", action="store_true", help="Don't apply loudness normalization")
+    parser.add_argument("--no-overwrite", action="store_true", help="Don't overwrite existing files")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     main(args)
