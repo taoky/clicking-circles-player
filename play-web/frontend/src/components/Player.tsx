@@ -2,7 +2,7 @@ import { usePlayer } from '@/context/PlayerContext';
 import { useCallback } from 'react';
 import { FaPlay, FaPause, FaStepForward, FaStepBackward } from 'react-icons/fa';
 import { MdLanguage, MdRepeatOn, MdRepeat } from 'react-icons/md';
-import { getApiUrl } from '@/config';
+import { getDataUrl, getHashPath } from '@/config';
 
 export function Player() {
     const {
@@ -47,7 +47,7 @@ export function Player() {
             {currentSong.BGHashes[0] && (
                 <div className="absolute inset-0 opacity-20">
                     <img
-                        src={getApiUrl(`image/${currentSong.BGHashes[0]}`)}
+                        src={getDataUrl(`files/${getHashPath(currentSong.BGHashes[0])}`)}
                         alt="Background"
                         className="w-full h-full object-cover"
                     />

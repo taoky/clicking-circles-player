@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { usePlayer } from '@/context/PlayerContext';
 import { Song } from '@/types/song';
-import { getApiUrl } from '@/config';
+import { getDataUrl, getHashPath } from '@/config';
 
 export function SongList() {
     const { songs, currentIndex, play, isUnicode, searchQuery } = usePlayer();
@@ -45,7 +45,7 @@ export function SongList() {
                             {song.BGHashes[0] && (
                                 <img
                                     alt={song.Title}
-                                    src={getApiUrl(`image/${song.BGHashes[0]}`)}
+                                    src={getDataUrl(`files/${getHashPath(song.BGHashes[0])}`)}
                                     className="w-12 h-12 object-cover rounded mr-4"
                                     loading="lazy"
                                 />

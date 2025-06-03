@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode, useRef, useEffect } from 'react';
 import { Song } from '@/types/song';
 import { AudioService } from '@/services/AudioService';
-import { getApiUrl } from '@/config';
+import { getDataUrl, getHashPath } from '@/config';
 
 interface PlayerContextType {
     currentSong: Song | null;
@@ -129,7 +129,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             const song = songs[index];
 
             audioRef.current.stop();
-            await audioRef.current.load(getApiUrl(`audio/${song.AudioHash}`));
+            await audioRef.current.load(getDataUrl(`files/${getHashPath(song.AudioHash)}`));
             await audioRef.current.play();
             setCurrentSong(song);
             setCurrentIndex(index);
@@ -194,7 +194,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 // TODO: trim image to square
                 // artwork: currentSong.BGHashes[0] ? [
                 //     {
-                //         src: getApiUrl(`image/${currentSong.BGHashes[0]}`),
+                //         src: getDataUrl(`files/${getHashPath(currentSong.BGHashes[0])}`),
                 //         type: 'image/jpeg',
                 //     }
                 // ] : undefined

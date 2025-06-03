@@ -7,7 +7,7 @@ import { Player } from '@/components/Player';
 import { SongList } from '@/components/SongList';
 import { Search } from '@/components/Search';
 import { usePlayer } from '@/context/PlayerContext';
-import { getApiUrl } from '@/config';
+import { getDataUrl } from '@/config';
 
 function MainContent() {
     const { setSongs } = usePlayer();
@@ -15,7 +15,7 @@ function MainContent() {
     useEffect(() => {
         const fetchSongs = async () => {
             try {
-                const response = await axios.get(getApiUrl('songs'));
+                const response = await axios.get(getDataUrl('song.json'));
                 setSongs(response.data);
             } catch (error) {
                 console.error('Error fetching songs:', error);

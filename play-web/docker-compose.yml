@@ -1,31 +1,17 @@
 version: '3'
 
 services:
-  frontend:
-    image: ghcr.io/taoky/clicking-circles-player-frontend:master
-    environment:
-      - NEXT_PUBLIC_API_URL=/api
-    restart: unless-stopped
-    hostname: frontend
-
-  backend:
-    image: ghcr.io/taoky/clicking-circles-player-backend:master
-    volumes:
-      - $HOME/.var/app/sh.ppy.osu/data/osu/files/:/data/files:ro
-      - $HOME/Projects/clicking-circles-player/song.json:/data/song.json:ro
-    environment:
-      - DATA_DIR=/data
-    restart: unless-stopped
-    hostname: backend
-
   nginx:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8000:80"
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - frontend
-      - backend 
+      - $HOME/.var/app/sh.ppy.osu/data/osu/files/:/data/files:ro
+      - $HOME/Projects/clicking-circles-player/song.json:/data/song.json:ro
     restart: unless-stopped
     hostname: nginx
+
+volumes:
+  frontend:
