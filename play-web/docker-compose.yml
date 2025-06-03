@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   nginx:
     build:
@@ -12,6 +10,3 @@ services:
       - $HOME/Projects/clicking-circles-player/song.json:/data/song.json:ro
     restart: unless-stopped
     hostname: nginx
-
-volumes:
-  frontend:
