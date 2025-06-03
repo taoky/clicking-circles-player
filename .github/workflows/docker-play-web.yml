@@ -12,7 +12,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: play-web
+  IMAGE_NAME: taoky/play-web
 
 jobs:
   build-and-push:
