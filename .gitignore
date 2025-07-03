@@ -4,3 +4,4 @@ client.realm
 song*.json
 filelist
 song*.tar.*
+.flatpak-builder/

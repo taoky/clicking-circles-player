@@ -1,0 +1,60 @@
+app-id: moe.taoky.clicking-circles-player
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: play
+finish-args:
+  - --socket=pulseaudio
+  - --own-name=moe.taoky.clicking-circles-player
+  # TODO: use portal for inhibiting
+  - --system-talk-name=org.freedesktop.login1
+  - --filesystem=~/.wine:ro
+  - --filesystem=~/.osu:ro
+  - --filesystem=~/.local/share/osu-wine:ro
+  - --filesystem=~/.var/app/sh.ppy.osu/data/osu/files:ro
+separate-locales: false
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  build-args:
+    - --share=network
+  env:
+    - CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+
+modules:
+  - mpv.json
+  - name: chafa
+    buildsystem: autotools
+    sources:
+      - type: archive
+        url: https://hpjansson.org/chafa/releases/chafa-1.16.1.tar.xz
+        sha256: 4a25debb71530baf0a748b15cfee6b8da6b513f696d9484987eaf410ecce1129
+  - name: play
+    buildsystem: simple
+    build-commands:
+      - cargo fetch --manifest-path Cargo.toml
+      - LIBRARY_PATH=/app/lib cargo build --release
+      - install -Dm755 ./target/release/play /app/bin/play
+    sources:
+      # avoid rebuilding when nothing changed
+      - type: file
+        path: ../Cargo.toml
+      - type: file
+        path: ../Cargo.lock
+      - type: file
+        path: ../src/main.rs
+        dest: src/
+  - name: misc
+    buildsystem: simple
+    build-commands:
+      - install -D -t /app/share/applications/ moe.taoky.clicking-circles-player.desktop
+      - install -D -t /app/share/icons/hicolor/scalable/apps/ moe.taoky.clicking-circles-player.svg
+      - install -D -t /app/share/icons/hicolor/symbolic/apps/ moe.taoky.clicking-circles-player-symbolic.svg
+    sources:
+      - type: file
+        path: moe.taoky.clicking-circles-player.desktop
+      - type: file
+        path: moe.taoky.clicking-circles-player.svg
+      - type: file
+        path: moe.taoky.clicking-circles-player-symbolic.svg

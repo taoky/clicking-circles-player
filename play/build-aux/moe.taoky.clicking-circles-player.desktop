@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Clicking Circles Player (TUI)
+Exec=play
+Type=Application
+Icon=moe.taoky.clicking-circles-player
+Categories=AudioVideo;Player;Audio;
+Terminal=true
+NoDisplay=true

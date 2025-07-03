@@ -32,6 +32,15 @@ cargo build --release
 target/release/play ../song.json ~/.var/app/sh.ppy.osu/data/osu/files/
 ```
 
+#### Flatpak build
+
+```sh
+flatpak-builder --install repo build-aux/moe.taoky.clicking-circles-player.yaml --user --force-clean
+flatpak run --file-forwarding moe.taoky.clicking-circles-player @@ ../song.json @@ ~/.var/app/sh.ppy.osu/data/osu/files/
+```
+
+Please note that flatpak currently does not support forwarding folder (see <https://github.com/flatpak/flatpak/issues/4799>). You need to add folder to permissions manually (e.g., use Flatseal) if it's not at osu!'s default location.
+
 #### Keyboard shortcuts
 
 - q: quit
