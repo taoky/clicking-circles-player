@@ -10,9 +10,7 @@ finish-args:
   - --own-name=moe.taoky.clicking-circles-player
   # TODO: use portal for inhibiting
   - --system-talk-name=org.freedesktop.login1
-  - --filesystem=~/.wine:ro
-  - --filesystem=~/.osu:ro
-  - --filesystem=~/.local/share/osu-wine:ro
+  - --filesystem=~/.local/share/osu/files:ro
   - --filesystem=~/.var/app/sh.ppy.osu/data/osu/files:ro
 separate-locales: false
 build-options:
