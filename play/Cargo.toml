@@ -11,7 +11,7 @@ chafa = ["ratatui-image/chafa"]
 clap = { version = "4.5.7", features = ["derive"] }
 crossterm = "0.27.0"
 image = "0.25.1"
-keepawake = "0.5.1"
+keepawake = { git = "https://github.com/taoky/keepawake-rs", rev = "c34f8cbf161c519e7a682511c67c0860de9f48b6" }
 libmpv-sirno = "=2.0.2-fork.1"
 rand = "0.8.5"
 ratatui = "0.27"
@@ -28,4 +28,4 @@ lto = false
 
 # Vendor bindgen for flatpak builds
 [patch.crates-io]
-chafa-sys = { git = "https://github.com/taoky/chafa-sys", branch = "master" }
+chafa-sys = { git = "https://github.com/taoky/chafa-sys", rev = "c3991e985a1bd2b22e767f28080a6e1dd4c85a28" }
