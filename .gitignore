@@ -5,3 +5,4 @@ song*.json
 filelist
 song*.tar.*
 .flatpak-builder/
+*.flatpak
