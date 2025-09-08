@@ -17,13 +17,6 @@
             "sha256": "2ca92437affb62c2b559b4419ea4785c70d023590500e8a52e95ea3ab4554683"
         }
     ],
-    "add-extensions": {
-        "org.freedesktop.Platform.ffmpeg-full": {
-            "directory": "lib/ffmpeg",
-            "version": "24.08",
-            "add-ld-path": "."
-        }
-    },
     "modules": [
         {
             "name": "luajit",
@@ -114,7 +107,8 @@
             "buildsystem": "cmake-ninja",
             "config-opts": [
                 "-DCMAKE_BUILD_TYPE=Release",
-                "-DBUILD_STATIC=0"
+                "-DBUILD_STATIC=0",
+                "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
             ],
             "cleanup": [
                 "/bin",
@@ -125,8 +119,8 @@
             "sources": [
                 {
                     "type": "archive",
-                    "url": "https://gitlab.freedesktop.org/uchardet/uchardet/-/archive/v0.0.7/uchardet-v0.0.7.tar.gz",
-                    "sha256": "f3635d1d10e1470452bc42c1bf509451a9926b399a11740a9949e86069d69f58"
+                    "url": "https://gitlab.freedesktop.org/uchardet/uchardet/-/archive/v0.0.8/uchardet-v0.0.8.tar.gz",
+                    "sha256": "5aa402a1b5b1dbb8d81096f141ff1224e079f4d3a1db0f79ecca782756d3a416"
                 }
             ]
         },
@@ -137,12 +131,14 @@
                 "/include",
                 "/lib/pkgconfig"
             ],
+            "config-opts": [
+                "-Dauto_features=disabled"
+            ],
             "sources": [
                 {
                     "type": "git",
                     "url": "https://github.com/haasn/libplacebo.git",
-                    "commit": "1fd3c7bde7b943fe8985c893310b5269a09b46c5",
-                    "tag": "v7.349.0"
+                    "commit": "515da9548ad734d923c7d0988398053f87b454d5"
                 }
             ]
         }
