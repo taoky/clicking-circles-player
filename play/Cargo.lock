@@ -2629,7 +2629,7 @@ dependencies = [
 [[package]]
 name = "souvlaki"
 version = "0.8.3"
-source = "git+https://github.com/taoky/souvlaki.git?rev=1e7222fa9dcf2c3111ce7d881464437d7c396f3f#1e7222fa9dcf2c3111ce7d881464437d7c396f3f"
+source = "git+https://github.com/taoky/souvlaki.git?rev=62b8caaac62b214f743b566c239bb78811d460e5#62b8caaac62b214f743b566c239bb78811d460e5"
 dependencies = [
  "base64",
  "block",
