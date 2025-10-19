@@ -6,3 +6,4 @@ filelist
 song*.tar.*
 .flatpak-builder/
 *.flatpak
+play/repo/
