@@ -1,0 +1,28 @@
+name: Flatpak Build and Release
+
+on:
+  - push
+
+jobs:
+  flatpak:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: moe.taoky.clicking-circles-player.flatpak
+          manifest-path: play/build-aux/moe.taoky.clicking-circles-player.yaml
+          cache-key: flatpak-builder-${{ github.sha }}
+      - name: Set Release Version
+        if: startsWith(github.ref, 'refs/tags/')
+        id: vars
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            moe.taoky.clicking-circles-player.flatpak
