@@ -689,6 +689,9 @@ struct Cli {
     #[clap(long = "loudnorm", default_value_t = true, action = clap::ArgAction::SetTrue)]
     #[clap(long = "no-loudnorm", action = clap::ArgAction::SetFalse)]
     loudnorm: bool,
+
+    #[clap(long, default_value_t = false)]
+    force_pixelart: bool,
 }
 
 pub fn init_tui() -> io::Result<Terminal<impl ratatui::backend::Backend>> {
@@ -724,7 +727,15 @@ fn main() {
     let mut terminal = init_tui().unwrap();
     terminal.clear().unwrap();
     let mut picker = Picker::from_termios().unwrap_or(Picker::new((7, 14)));
-    picker.guess_protocol();
+    if args.force_pixelart {
+        #[cfg(feature = "chafa")]
+        let protocol = ratatui_image::picker::ProtocolType::Chafa;
+        #[cfg(not(feature = "chafa"))]
+        let protocol = ratatui_image::picker::ProtocolType::Halfblocks;
+        picker.protocol_type = protocol;
+    } else {
+        picker.guess_protocol();
+    }
 
     let mpv = Mpv::with_initializer(|c| c.set_property("load-scripts", "no")).unwrap();
     mpv.set_property("vo", "null").unwrap();
