@@ -3,10 +3,6 @@ name = "play"
 version = "0.1.0"
 edition = "2024"
 
-[features]
-default = ["chafa"]
-chafa = ["ratatui-image/chafa"]
-
 [dependencies]
 clap = { version = "4.5.7", features = ["derive"] }
 crossterm = "0.27.0"
@@ -14,8 +10,8 @@ image = "0.25.1"
 keepawake = { git = "https://github.com/taoky/keepawake-rs", rev = "c34f8cbf161c519e7a682511c67c0860de9f48b6" }
 libmpv-sirno = "=2.0.2-fork.1"
 rand = "0.8.5"
-ratatui = "0.27"
-ratatui-image = { git = "https://github.com/taoky/ratatui-image.git", rev = "10914ba54113bb894e62278b9d4bdfbafd2a2b9c" }
+ratatui = "0.30.0"
+ratatui-image = "10.0.5"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.117"
 souvlaki = { git = "https://github.com/taoky/souvlaki.git", rev = "62b8caaac62b214f743b566c239bb78811d460e5", default-features = false, features = ["use_zbus"] }
@@ -25,7 +21,3 @@ xdg = "2.5.2"
 
 [profile.release]
 lto = false
-
-# Vendor bindgen for flatpak builds
-[patch.crates-io]
-chafa-sys = { git = "https://github.com/taoky/chafa-sys", rev = "c3991e985a1bd2b22e767f28080a6e1dd4c85a28" }

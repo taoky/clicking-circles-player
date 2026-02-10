@@ -18,7 +18,8 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::Layout,
     style::{Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap, block::Title},
+    text::Line,
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
 };
 use ratatui_image::{StatefulImage, picker::Picker, protocol::StatefulProtocol};
 use serde::{Deserialize, Deserializer};
@@ -156,7 +157,7 @@ struct App {
     source: String,
     cover_path: Option<PathBuf>,
     is_unicode: bool,
-    bg_img: Box<dyn StatefulProtocol>,
+    bg_img: StatefulProtocol,
     osu_path: PathBuf,
     json_item: Vec<JsonItem>,
     controls: MediaControls,
@@ -180,7 +181,7 @@ fn empty_image() -> DynamicImage {
 
 impl App {
     fn new(
-        mut picker: ratatui_image::picker::Picker,
+        picker: &ratatui_image::picker::Picker,
         controls: MediaControls,
         osu_path: &Path,
         json_item: Vec<JsonItem>,
@@ -253,7 +254,7 @@ impl App {
         )
     }
 
-    fn update_metadata(&mut self, mut picker: Option<ratatui_image::picker::Picker>) {
+    fn update_metadata(&mut self, mut picker: Option<&ratatui_image::picker::Picker>) {
         let item = &get_current_item!(self);
         self.title = self.get_title(item);
         self.artist = self.get_artist(item);
@@ -404,7 +405,7 @@ fn main_ui<B>(
     terminal: &mut Terminal<B>,
     app: &mut App,
     mpv_control_tx: mpsc::Sender<InternalControl>,
-    picker: Picker,
+    picker: &Picker,
 ) where
     B: ratatui::backend::Backend,
 {
@@ -414,7 +415,7 @@ fn main_ui<B>(
                 let outer_block = Block::default()
                     .title(APP_DISPLAY_NAME)
                     .title(
-                        Title::from(format!("{}/{}", app.idx + 1, app.json_item.len()))
+                        Line::from(format!("{}/{}", app.idx + 1, app.json_item.len()))
                             .alignment(ratatui::layout::Alignment::Right),
                     )
                     .borders(Borders::TOP);
@@ -426,10 +427,9 @@ fn main_ui<B>(
                             ratatui::layout::Constraint::Percentage(10),
                             ratatui::layout::Constraint::Percentage(90),
                         ]
-                        .as_ref(),
                     )
-                    .split(outer_block.inner(frame.size()));
-                frame.render_widget(outer_block, frame.size());
+                    .split(outer_block.inner(frame.area()));
+                frame.render_widget(outer_block, frame.area());
                 frame.render_widget(
                     Paragraph::new(format!(
                         "{} - {} {:.1} / {:.1} ({}{})",
@@ -443,7 +443,7 @@ fn main_ui<B>(
                     .wrap(Wrap { trim: true }),
                     chunks[0],
                 );
-                let imgw = StatefulImage::new(None);
+                let imgw = StatefulImage::default();
                 frame.render_stateful_widget(imgw, chunks[1], &mut app.bg_img);
             })
             .unwrap();
@@ -501,7 +501,7 @@ fn search_ui<B>(
     terminal: &mut Terminal<B>,
     app: &mut App,
     mpv_control_tx: mpsc::Sender<InternalControl>,
-    picker: Picker,
+    picker: &Picker,
 ) where
     B: ratatui::backend::Backend,
 {
@@ -517,10 +517,9 @@ fn search_ui<B>(
                             ratatui::layout::Constraint::Length(3),
                             ratatui::layout::Constraint::Min(3),
                         ]
-                        .as_ref(),
                     )
-                    .split(outer_block.inner(frame.size()));
-                frame.render_widget(outer_block, frame.size());
+                    .split(outer_block.inner(frame.area()));
+                frame.render_widget(outer_block, frame.area());
                 let width = chunks[0].width.max(3) - 3;
                 let scroll = app.search_state.input.visual_scroll(width as usize);
                 let input = Paragraph::new(app.search_state.input.value())
@@ -532,12 +531,12 @@ fn search_ui<B>(
                     .block(Block::default().borders(Borders::ALL).title("Search"));
                 frame.render_widget(input, chunks[0]);
                 if app.search_state.input_mode == InputMode::Editing {
-                    frame.set_cursor(
+                    frame.set_cursor_position((
                         chunks[0].x
                             + 1
                             + (app.search_state.input.visual_cursor().max(scroll) - scroll) as u16,
                         chunks[0].y + 1,
-                    );
+                    ));
                 }
                 let items: Vec<ListItem> = app
                     .search_state
@@ -726,16 +725,12 @@ fn main() {
     init_panic_hook();
     let mut terminal = init_tui().unwrap();
     terminal.clear().unwrap();
-    let mut picker = Picker::from_termios().unwrap_or(Picker::new((7, 14)));
-    if args.force_pixelart {
-        #[cfg(feature = "chafa")]
-        let protocol = ratatui_image::picker::ProtocolType::Chafa;
-        #[cfg(not(feature = "chafa"))]
-        let protocol = ratatui_image::picker::ProtocolType::Halfblocks;
-        picker.protocol_type = protocol;
+
+    let picker = if args.force_pixelart {
+        Picker::halfblocks()
     } else {
-        picker.guess_protocol();
-    }
+        Picker::from_query_stdio().expect("cannot get Picker")
+    };
 
     let mpv = Mpv::with_initializer(|c| c.set_property("load-scripts", "no")).unwrap();
     mpv.set_property("vo", "null").unwrap();
@@ -838,10 +833,10 @@ fn main() {
         })
         .unwrap();
 
-    let mut app = App::new(picker, controls, &args.osu_path, json_item, xdg_dirs);
+    let mut app = App::new(&picker, controls, &args.osu_path, json_item, xdg_dirs);
 
     app.open(mpv_control_tx.clone());
-    app.update_metadata(Some(picker));
+    app.update_metadata(Some(&picker));
 
     loop {
         if let Ok(msg) = mpv_event_rx.try_recv() {
@@ -855,7 +850,7 @@ fn main() {
                         app.next_idx();
                     }
                     app.open(mpv_control_tx.clone());
-                    app.update_metadata(Some(picker));
+                    app.update_metadata(Some(&picker));
                 }
                 InternalEvent::Duration(duration) => {
                     app.update_duration(duration);
@@ -866,9 +861,9 @@ fn main() {
             }
         }
         if app.ui_state == UIState::Main {
-            main_ui(&mut terminal, &mut app, mpv_control_tx.clone(), picker);
+            main_ui(&mut terminal, &mut app, mpv_control_tx.clone(), &picker);
         } else {
-            search_ui(&mut terminal, &mut app, mpv_control_tx.clone(), picker);
+            search_ui(&mut terminal, &mut app, mpv_control_tx.clone(), &picker);
         }
 
         for event in souvlaki_rx.try_iter() {
@@ -886,12 +881,12 @@ fn main() {
                 MediaControlEvent::Next => {
                     app.next_idx();
                     app.open(mpv_control_tx.clone());
-                    app.update_metadata(Some(picker));
+                    app.update_metadata(Some(&picker));
                 }
                 MediaControlEvent::Previous => {
                     app.prev_idx();
                     app.open(mpv_control_tx.clone());
-                    app.update_metadata(Some(picker));
+                    app.update_metadata(Some(&picker));
                 }
                 _ => (),
             }
